@@ -14,11 +14,7 @@ public partial class Program
 {
     private static void Main(string[] args)
     {
-        var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
-        if (File.Exists(envPath))
-        {
-            Env.Load(envPath);
-        }
+        LoadEnvironmentVariables();
 
         var awsAccessKeyId = Environment.GetEnvironmentVariable("ACCESS_KEY_ID")
             ?? throw new InvalidOperationException("ACCESS_KEY_ID is missing.");
@@ -114,5 +110,22 @@ public partial class Program
         app.MapControllers();
 
         app.Run();
+    }
+
+    private static void LoadEnvironmentVariables()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory != null)
+        {
+            var envPath = Path.Combine(directory.FullName, ".env");
+            if (File.Exists(envPath))
+            {
+                Env.Load(envPath);
+                return;
+            }
+
+            directory = directory.Parent;
+        }
     }
 }

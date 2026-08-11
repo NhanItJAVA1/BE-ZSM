@@ -162,3 +162,8 @@ C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\Swashbuck
 C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
 C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\BCrypt-Net-Next.dll
 C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\AWSSDK.Core.dll
+C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\AWSSDK.S3.dll
+C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\DotNetEnv.dll
+C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\bin\Debug\net10.0\Superpower.dll
+C:\Application\Intern-C#\BE-Source-ZSM\BE-ZSM\BE-ZSM\obj\Debug\net10.0\BE-ZSM.sourcelink.json

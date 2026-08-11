@@ -8,7 +8,9 @@ obj/
 *.suo
 
 # Environment
-
+.env
+.env.*
+!.env.example
 
 # Local configuration
 appsettings.Development.json

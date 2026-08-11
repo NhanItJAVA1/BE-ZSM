@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BE-ZSM")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e4d7ef28560d0cec974b6dedfc812760767453d9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e610ba7e2127cff4b5fe5440cf730b532dcec450")]
 [assembly: System.Reflection.AssemblyProductAttribute("BE-ZSM")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BE-ZSM")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

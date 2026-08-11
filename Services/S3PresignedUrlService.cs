@@ -9,6 +9,11 @@ namespace BE_ZSM.Services
         string PublicUrl,
         DateTime ExpiresAtUtc);
 
+    public sealed record DirectUploadResult(
+        string ObjectKey,
+        string PublicUrl,
+        DateTime UploadedAtUtc);
+
     public class S3PresignedUrlService
     {
         private readonly IAmazonS3 _s3Client;
@@ -55,6 +60,36 @@ namespace BE_ZSM.Services
                 objectKey,
                 publicUrl,
                 expiresAtUtc);
+        }
+
+        public async Task<DirectUploadResult> UploadVideoAsync(IFormFile file)
+        {
+            var extension = Path.GetExtension(file.FileName);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".mp4";
+            }
+
+            var objectKey = $"records/videos/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}{extension}";
+            var publicUrl = $"https://{_bucketName}.s3.{_region}.amazonaws.com/{objectKey}";
+
+            await using var stream = file.OpenReadStream();
+            var request = new PutObjectRequest
+            {
+                BucketName = _bucketName,
+                Key = objectKey,
+                InputStream = stream,
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "video/mp4"
+                    : file.ContentType
+            };
+
+            await _s3Client.PutObjectAsync(request);
+
+            return new DirectUploadResult(
+                objectKey,
+                publicUrl,
+                DateTime.UtcNow);
         }
     }
 }

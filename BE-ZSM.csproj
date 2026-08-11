@@ -30,4 +30,8 @@
     <Folder Include="Repositories\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\.env" Link=".env" />
+  </ItemGroup>
+
 </Project>

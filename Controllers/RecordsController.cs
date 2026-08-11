@@ -66,6 +66,31 @@ namespace BE_ZSM.Controllers
             return Ok(record);
         }
 
+        // POST: api/Records/video-upload
+        [Authorize]
+        [HttpPost("video-upload")]
+        [Consumes("multipart/form-data")]
+        public async Task<ActionResult<RecordVideoDirectUploadResponseDto>> UploadVideo(
+            [FromForm] IFormFile videoFile)
+        {
+            if (videoFile == null || videoFile.Length == 0)
+            {
+                return BadRequest(new
+                {
+                    message = "videoFile is required"
+                });
+            }
+
+            var result = await _s3PresignedUrlService.UploadVideoAsync(videoFile);
+
+            return Ok(new RecordVideoDirectUploadResponseDto
+            {
+                ObjectKey = result.ObjectKey,
+                PublicUrl = result.PublicUrl,
+                UploadedAtUtc = result.UploadedAtUtc
+            });
+        }
+
         // POST: api/Records/video-upload-url
         [Authorize]
         [HttpPost("video-upload-url")]

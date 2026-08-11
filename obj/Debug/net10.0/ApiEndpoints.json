@@ -237,6 +237,32 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "BE_ZSM.Controllers.RecordsController",
+    "Method": "CreateVideoUploadUrl",
+    "RelativePath": "api/Records/video-upload-url",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "BE_ZSM.DTOs.Records.CreateRecordVideoUploadDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "BE_ZSM.DTOs.Records.RecordVideoUploadResponseDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "BE_ZSM.Controllers.UsersController",
     "Method": "GetUsers",
     "RelativePath": "api/Users",
