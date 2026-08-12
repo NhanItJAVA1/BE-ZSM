@@ -1,7 +1,9 @@
 ﻿using BE_ZSM.Entities;
+using BE_ZSM.Enums;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace BE_ZSM.Services
@@ -32,6 +34,11 @@ namespace BE_ZSM.Services
                 new Claim(
                     ClaimTypes.Email,
                     user.Email
+                ),
+
+                new Claim(
+                    ClaimTypes.Role,
+                    user.Role.Name.ToString()
                 )
             };
 
@@ -60,6 +67,17 @@ namespace BE_ZSM.Services
 
             return new JwtSecurityTokenHandler()
                 .WriteToken(token);
+        }
+        public string GenerateRefreshToken()
+        {
+            var randomBytes = RandomNumberGenerator.GetBytes(64);
+
+            return Convert.ToBase64String(randomBytes);
+        }
+
+        public DateTime GetRefreshTokenExpiration()
+        {
+            return DateTime.UtcNow.AddDays(7);
         }
     }
 }

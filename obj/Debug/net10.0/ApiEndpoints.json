@@ -1,5 +1,31 @@
 [
   {
+    "ContainingType": "BE_ZSM.Controllers.CatalogController",
+    "Method": "CreateImageUploadUrl",
+    "RelativePath": "api/Catalog/image-upload-url",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "BE_ZSM.DTOs.Catalog.CreateCatalogImageUploadDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "BE_ZSM.DTOs.Catalog.CatalogImageUploadResponseDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
     "ContainingType": "BE_ZSM.Controllers.GameModesController",
     "Method": "GetGameModes",
     "RelativePath": "api/GameModes",
@@ -238,6 +264,42 @@
   },
   {
     "ContainingType": "BE_ZSM.Controllers.RecordsController",
+    "Method": "TestEndpoint",
+    "RelativePath": "api/Records/test",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "BE_ZSM.Controllers.RecordsController",
+    "Method": "UploadVideo",
+    "RelativePath": "api/Records/video-upload",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "VideoFile",
+        "Type": "Microsoft.AspNetCore.Http.IFormFile",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "BE_ZSM.DTOs.Records.RecordVideoDirectUploadResponseDto",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "BE_ZSM.Controllers.RecordsController",
     "Method": "CreateVideoUploadUrl",
     "RelativePath": "api/Records/video-upload-url",
     "HttpMethod": "POST",
@@ -336,6 +398,22 @@
       {
         "Name": "dto",
         "Type": "BE_ZSM.DTOs.Users.LoginUserDto",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "BE_ZSM.Controllers.UsersController",
+    "Method": "RefreshToken",
+    "RelativePath": "api/Users/refresh-token",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "dto",
+        "Type": "BE_ZSM.DTOs.RefreshToken.RefreshTokenDto",
         "IsRequired": true
       }
     ],

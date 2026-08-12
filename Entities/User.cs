@@ -14,10 +14,15 @@
 
         public string? AvatarUrl { get; set; }
 
+        public int RoleId { get; set; }
+
+        public Role Role { get; set; } = null!;
+            
         public DateTime CreatedAt { get; set; }
 
         public DateTime UpdatedAt { get; set; }
 
         public ICollection<Record> Records { get; set; } = new List<Record>();
+        public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     }
 }

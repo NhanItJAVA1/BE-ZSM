@@ -17,31 +17,49 @@ namespace BE_ZSM.Controllers
         private readonly RecordHelper _recordHelper;
         private readonly DbSaveHelper _dbSaveHelper;
         private readonly S3PresignedUrlService _s3PresignedUrlService;
+        private readonly RecordMapperHelper _recordMapperHelper;
 
         public RecordsController(
             AppDbContext context,
             RecordHelper recordHelper,
             DbSaveHelper dbSaveHelper,
-            S3PresignedUrlService s3PresignedUrlService)
+            S3PresignedUrlService s3PresignedUrlService,
+            RecordMapperHelper recordMapperHelper)
         {
             _context = context;
             _recordHelper = recordHelper;
             _dbSaveHelper = dbSaveHelper;
             _s3PresignedUrlService = s3PresignedUrlService;
+            _recordMapperHelper = recordMapperHelper;
         }
 
         // GET: api/Records
         [HttpGet]
         public async Task<IActionResult> GetRecords()
         {
-            var records = await _context.Records
-                .Include(r => r.User)
-                .Include(r => r.Map)
-                .Include(r => r.GameMode)
-                .Include(r => r.Vehicle)
-                .ToListAsync();
+            try
+            {
+                var records = await _context.Records
+                    .Include(r => r.User)
+                    .Include(r => r.Map)
+                    .Include(r => r.GameMode)
+                    .Include(r => r.Vehicle)
+                    .ToListAsync();
 
-            return Ok(records);
+                var dtos = _recordMapperHelper.MapToResponseDtos(records);
+                return Ok(dtos);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            }
+        }
+
+        // TEST ENDPOINT - Remove after debugging
+        [HttpGet("test")]
+        public IActionResult TestEndpoint()
+        {
+            return Ok(new { message = "Controller is working", timestamp = DateTime.UtcNow });
         }
 
         // GET: api/Records/{id}
@@ -63,7 +81,8 @@ namespace BE_ZSM.Controllers
                 });
             }
 
-            return Ok(record);
+            var dto = _recordMapperHelper.MapToResponseDto(record);
+            return Ok(dto);
         }
 
         // POST: api/Records/video-upload
@@ -71,17 +90,17 @@ namespace BE_ZSM.Controllers
         [HttpPost("video-upload")]
         [Consumes("multipart/form-data")]
         public async Task<ActionResult<RecordVideoDirectUploadResponseDto>> UploadVideo(
-            [FromForm] IFormFile videoFile)
+            [FromForm] VideoUploadFormDto form)
         {
-            if (videoFile == null || videoFile.Length == 0)
+            if (form?.VideoFile == null || form.VideoFile.Length == 0)
             {
                 return BadRequest(new
                 {
-                    message = "videoFile is required"
+                    message = "VideoFile is required"
                 });
             }
 
-            var result = await _s3PresignedUrlService.UploadVideoAsync(videoFile);
+            var result = await _s3PresignedUrlService.UploadVideoAsync(form.VideoFile);
 
             return Ok(new RecordVideoDirectUploadResponseDto
             {
@@ -144,10 +163,21 @@ namespace BE_ZSM.Controllers
                 });
             }
 
+            // Reload with related entities to return DTO
+            await _context.Entry(record)
+                .Reference(r => r.User).LoadAsync();
+            await _context.Entry(record)
+                .Reference(r => r.Map).LoadAsync();
+            await _context.Entry(record)
+                .Reference(r => r.Vehicle).LoadAsync();
+            await _context.Entry(record)
+                .Reference(r => r.GameMode).LoadAsync();
+
+            var responseDto = _recordMapperHelper.MapToResponseDto(record);
             return CreatedAtAction(
                 nameof(GetRecord),
                 new { id = record.Id },
-                record
+                responseDto
             );
         }
 
@@ -159,6 +189,10 @@ namespace BE_ZSM.Controllers
             CreateRecordDto dto)
         {
             var record = await _context.Records
+                .Include(r => r.User)
+                .Include(r => r.Map)
+                .Include(r => r.GameMode)
+                .Include(r => r.Vehicle)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (record == null)
@@ -181,7 +215,8 @@ namespace BE_ZSM.Controllers
                 });
             }
 
-            return Ok(record);
+            var responseDto = _recordMapperHelper.MapToResponseDto(record);
+            return Ok(responseDto);
         }
 
         // DELETE: api/Records/{id}

@@ -8,7 +8,7 @@ namespace BE_ZSM.Services
         string ObjectKey,
         string PublicUrl,
         DateTime ExpiresAtUtc);
-
+        
     public sealed record DirectUploadResult(
         string ObjectKey,
         string PublicUrl,
@@ -19,6 +19,7 @@ namespace BE_ZSM.Services
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
         private readonly string _region;
+
 
         public S3PresignedUrlService(IAmazonS3 s3Client, IConfiguration configuration)
         {
@@ -41,6 +42,49 @@ namespace BE_ZSM.Services
             }
 
             var objectKey = $"records/videos/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}{extension}";
+            var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiresMinutes);
+
+            var request = new GetPreSignedUrlRequest
+            {
+                BucketName = _bucketName,
+                Key = objectKey,
+                Verb = HttpVerb.PUT,
+                Expires = expiresAtUtc,
+                ContentType = contentType
+            };
+
+            var uploadUrl = _s3Client.GetPreSignedURL(request);
+            var publicUrl = $"https://{_bucketName}.s3.{_region}.amazonaws.com/{objectKey}";
+
+            return new PresignedUploadResult(
+                uploadUrl,
+                objectKey,
+                publicUrl,
+                expiresAtUtc);
+        }
+
+        public PresignedUploadResult CreateImageUploadUrl(
+            string fileName,
+            string contentType,
+            string category = "maps",
+            int expiresMinutes = 15)
+        {
+            var safeCategory = category.Equals("vehicles", StringComparison.OrdinalIgnoreCase)
+                ? "vehicles"
+                : "maps";
+
+            var extension = Path.GetExtension(fileName);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = contentType.StartsWith("image/png", StringComparison.OrdinalIgnoreCase)
+                    ? ".png"
+                    : contentType.StartsWith("image/webp", StringComparison.OrdinalIgnoreCase)
+                        ? ".webp"
+                        : ".jpg";
+            }
+
+            var objectKey =
+                $"catalog/images/{safeCategory}/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}{extension}";
             var expiresAtUtc = DateTime.UtcNow.AddMinutes(expiresMinutes);
 
             var request = new GetPreSignedUrlRequest
@@ -90,6 +134,23 @@ namespace BE_ZSM.Services
                 objectKey,
                 publicUrl,
                 DateTime.UtcNow);
+        }
+        public string CreateGetUrl(
+            string objectKey,
+            int expiresMinutes = 15){
+            var request = new GetPreSignedUrlRequest
+            {
+                BucketName = _bucketName,
+                Key = objectKey,
+                Verb = HttpVerb.GET,
+                Expires = DateTime.UtcNow.AddMinutes(expiresMinutes)
+            };
+
+            return _s3Client.GetPreSignedURL(request);
+        }
+        public string GetObjectKeyFromUrl(string url){
+            var uri = new Uri(url);
+            return uri.AbsolutePath.TrimStart('/');
         }
     }
 }

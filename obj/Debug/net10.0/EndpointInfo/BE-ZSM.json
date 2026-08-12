@@ -5,6 +5,54 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/Catalog/image-upload-url": {
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCatalogImageUploadDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCatalogImageUploadDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCatalogImageUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogImageUploadResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogImageUploadResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogImageUploadResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/GameModes": {
       "get": {
         "tags": [
@@ -296,6 +344,18 @@
         }
       }
     },
+    "/api/Records/test": {
+      "get": {
+        "tags": [
+          "Records"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Records/{id}": {
       "get": {
         "tags": [
@@ -376,6 +436,55 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Records/video-upload": {
+      "post": {
+        "tags": [
+          "Records"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "VideoFile": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "VideoFile": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVideoDirectUploadResponseDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVideoDirectUploadResponseDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordVideoDirectUploadResponseDto"
+                }
+              }
+            }
           }
         }
       }
@@ -586,6 +695,37 @@
         }
       }
     },
+    "/api/Users/refresh-token": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Vehicles": {
       "get": {
         "tags": [
@@ -714,6 +854,46 @@
   },
   "components": {
     "schemas": {
+      "CatalogImageUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "uploadUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "objectKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateCatalogImageUploadDto": {
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentType": {
+            "type": "string",
+            "nullable": true
+          },
+          "category": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "CreateGameModeDto": {
         "type": "object",
         "properties": {
@@ -735,9 +915,9 @@
             "type": "string",
             "nullable": true
           },
-          "slug": {
-            "type": "string",
-            "nullable": true
+          "rate": {
+            "type": "integer",
+            "format": "int32"
           },
           "imageUrl": {
             "type": "string",
@@ -809,9 +989,11 @@
             "type": "string",
             "nullable": true
           },
-          "slug": {
-            "type": "string",
-            "nullable": true
+          "type": {
+            "$ref": "#/components/schemas/VehicleType"
+          },
+          "rank": {
+            "$ref": "#/components/schemas/VehicleRank"
           },
           "imageUrl": {
             "type": "string",
@@ -834,6 +1016,24 @@
         },
         "additionalProperties": false
       },
+      "RecordVideoDirectUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "objectKey": {
+            "type": "string",
+            "nullable": true
+          },
+          "publicUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "uploadedAtUtc": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
       "RecordVideoUploadResponseDto": {
         "type": "object",
         "properties": {
@@ -852,6 +1052,16 @@
           "expiresAtUtc": {
             "type": "string",
             "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -903,9 +1113,9 @@
             "type": "string",
             "nullable": true
           },
-          "slug": {
-            "type": "string",
-            "nullable": true
+          "rate": {
+            "type": "integer",
+            "format": "int32"
           },
           "imageUrl": {
             "type": "string",
@@ -939,9 +1149,11 @@
             "type": "string",
             "nullable": true
           },
-          "slug": {
-            "type": "string",
-            "nullable": true
+          "type": {
+            "$ref": "#/components/schemas/VehicleType"
+          },
+          "rank": {
+            "$ref": "#/components/schemas/VehicleRank"
           },
           "imageUrl": {
             "type": "string",
@@ -949,6 +1161,29 @@
           }
         },
         "additionalProperties": false
+      },
+      "VehicleRank": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "VehicleType": {
+        "enum": [
+          0,
+          1,
+          2
+        ],
+        "type": "integer",
+        "format": "int32"
       }
     },
     "securitySchemes": {
@@ -966,6 +1201,9 @@
     }
   ],
   "tags": [
+    {
+      "name": "Catalog"
+    },
     {
       "name": "GameModes"
     },

@@ -2,6 +2,8 @@
 using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Entities;
 using BE_ZSM.Helpers;
+using BE_ZSM.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,29 +15,41 @@ namespace BE_ZSM.Controllers
     {
         private readonly AppDbContext _context;
         private readonly DbSaveHelper _dbSaveHelper;
+        private readonly S3PresignedUrlService _presignedUrlService;
 
-        public VehiclesController(AppDbContext context, DbSaveHelper dbSaveHelper)
+        public VehiclesController(AppDbContext context, DbSaveHelper dbSaveHelper, S3PresignedUrlService presignedUrlService)
         {
             _context = context;
             _dbSaveHelper = dbSaveHelper;
+            _presignedUrlService = presignedUrlService;
         }
 
         // GET: api/Vehicles
         [HttpGet]
         public async Task<IActionResult> GetVehicles()
         {
-            var vehicles = await _context.Vehicles
-                .Select(v => new
-                {
-                    v.Id,
-                    v.Name,
-                    v.Slug,
-                    v.ImageUrl,
-                    v.CreatedAt
-                })
-                .ToListAsync();
+            try
+            {
+                var vehicles = await _context.Vehicles
+                    .Select(v => new
+                    {
+                        v.Id,
+                        v.Name,
+                        v.Rank,
+                        v.Type,
+                        ImageUrl = string.IsNullOrWhiteSpace(v.ImageUrl) ? null : _presignedUrlService.CreateGetUrl(
+                            _presignedUrlService.GetObjectKeyFromUrl(v.ImageUrl)
+                            ),
+                        v.CreatedAt
+                    })
+                    .ToListAsync();
 
-            return Ok(vehicles);
+                return Ok(vehicles);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            }
         }
 
         // GET: api/Vehicles/{id}
@@ -48,8 +62,11 @@ namespace BE_ZSM.Controllers
                 {
                     v.Id,
                     v.Name,
-                    v.Slug,
-                    v.ImageUrl,
+                    v.Rank,
+                    v.Type,
+                    ImageUrl = string.IsNullOrWhiteSpace(v.ImageUrl) ? null : _presignedUrlService.CreateGetUrl(
+                            _presignedUrlService.GetObjectKeyFromUrl(v.ImageUrl)
+                        ),
                     v.CreatedAt
                 })
                 .FirstOrDefaultAsync();
@@ -67,13 +84,15 @@ namespace BE_ZSM.Controllers
 
         // POST: api/Vehicles
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateVehicle(
             CreateVehicleDto dto)
         {
             var vehicle = new Vehicle
             {
                 Name = dto.Name,
-                Slug = dto.Slug,
+                Rank = dto.Rank,
+                Type = dto.Type,
                 ImageUrl = dto.ImageUrl,
                 CreatedAt = DateTime.UtcNow
             };
@@ -98,6 +117,7 @@ namespace BE_ZSM.Controllers
 
         // PUT: api/Vehicles/{id}
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateVehicle(
             int id,
             UpdateVehicleDto dto)
@@ -114,7 +134,8 @@ namespace BE_ZSM.Controllers
             }
 
             vehicle.Name = dto.Name;
-            vehicle.Slug = dto.Slug;
+            vehicle.Rank = dto.Rank;
+            vehicle.Type = dto.Type;
             vehicle.ImageUrl = dto.ImageUrl;
 
             var saveError = await _dbSaveHelper.TrySaveChangesAsync();
@@ -130,7 +151,8 @@ namespace BE_ZSM.Controllers
             {
                 vehicle.Id,
                 vehicle.Name,
-                vehicle.Slug,
+                vehicle.Rank,
+                vehicle.Type,
                 vehicle.ImageUrl,
                 vehicle.CreatedAt
             });
@@ -138,6 +160,7 @@ namespace BE_ZSM.Controllers
 
         // DELETE: api/Vehicles/{id}
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteVehicle(int id)
         {
             var vehicle = await _context.Vehicles

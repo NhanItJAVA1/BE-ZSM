@@ -1,6 +1,8 @@
 ﻿using BE_ZSM.Contexts;
+using BE_ZSM.DTOs.RefreshToken;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
+using BE_ZSM.Enums;
 using BE_ZSM.Helpers;
 using BE_ZSM.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -37,6 +39,7 @@ namespace BE_ZSM.Controllers
                     u.Email,
                     u.DisplayName,
                     u.AvatarUrl,
+                    Role = u.Role.Name.ToString(),
                     u.CreatedAt,
                     u.UpdatedAt
                 })
@@ -58,6 +61,7 @@ namespace BE_ZSM.Controllers
                     u.Email,
                     u.DisplayName,
                     u.AvatarUrl,
+                    Role = u.Role.Name.ToString(),
                     u.CreatedAt,
                     u.UpdatedAt
                 })
@@ -105,6 +109,15 @@ namespace BE_ZSM.Controllers
             // Hash password
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
+            var userRole = await _context.Roles
+                .FirstOrDefaultAsync(r => r.Name == UserRole.User);
+            if (userRole == null) { 
+                return BadRequest(new
+                {
+                    message = "Default user role not found"
+                });
+            }
+
             var user = new User
             {
                 Username = dto.Username,
@@ -112,6 +125,8 @@ namespace BE_ZSM.Controllers
                 PasswordHash = passwordHash,
                 DisplayName = dto.DisplayName,
                 AvatarUrl = dto.AvatarUrl,
+                RoleId = userRole.Id,
+                Role = userRole,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -137,6 +152,7 @@ namespace BE_ZSM.Controllers
                     user.Email,
                     user.DisplayName,
                     user.AvatarUrl,
+                    Role = user.Role.Name.ToString(),
                     user.CreatedAt,
                     user.UpdatedAt
                 }
@@ -148,6 +164,7 @@ namespace BE_ZSM.Controllers
         public async Task<IActionResult> Login(LoginUserDto dto)
         {
             var user = await _context.Users
+                .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.Username == dto.Username);
 
             if (user == null)
@@ -172,12 +189,33 @@ namespace BE_ZSM.Controllers
             }
 
             var token = _jwtService.GenerateToken(user);
+            var rfToken = _jwtService.GenerateRefreshToken();
+
+            var refreshTokenEntity = new RefreshToken
+            {
+                UserId = user.Id,
+                Token = rfToken,
+                ExpiresAt = _jwtService.GetRefreshTokenExpiration(),
+            };
+
+            _context.RefreshTokens.Add(refreshTokenEntity);
+
+            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
+
+            if (saveError != null)
+            {
+                return BadRequest(new
+                {
+                    message = saveError
+                });
+            }
 
             return Ok(new
             {
                 message = "Login successful",
 
                 accessToken = token,
+                refreshToken = rfToken,
 
                 user = new
                 {
@@ -185,7 +223,8 @@ namespace BE_ZSM.Controllers
                     user.Username,
                     user.Email,
                     user.DisplayName,
-                    user.AvatarUrl
+                    user.AvatarUrl,
+                    Role = user.Role.Name.ToString()
                 }
             });
         }
@@ -197,6 +236,7 @@ namespace BE_ZSM.Controllers
             UpdateUserDto dto)
         {
             var user = await _context.Users
+                .Include(u => u.Role)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
             if (user == null)
@@ -242,6 +282,7 @@ namespace BE_ZSM.Controllers
                 user.Email,
                 user.DisplayName,
                 user.AvatarUrl,
+                Role = user.Role.Name.ToString(),
                 user.CreatedAt,
                 user.UpdatedAt
             });
@@ -275,5 +316,38 @@ namespace BE_ZSM.Controllers
 
             return NoContent();
         }
+
+        //POST : api/Users/refresh-token
+        [HttpPost("refresh-token")]
+        public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
+        {
+            var refreshToken = await _context.RefreshTokens
+                .Include(rt => rt.User)
+                .ThenInclude(u => u.Role)
+                .FirstOrDefaultAsync(rt => rt.Token == dto.RefreshToken);
+            if (refreshToken == null || refreshToken.RevokeAt != null || refreshToken.ExpiresAt < DateTime.UtcNow)
+            {
+                return Unauthorized(new
+                {
+                    message = "Invalid or expired refresh token"
+                });
+            }
+            var user = refreshToken.User;
+            var newAccessToken = _jwtService.GenerateToken(user);
+            return Ok(new
+            {
+                accessToken = newAccessToken,
+                user = new
+                {
+                    user.Id,
+                    user.Username,
+                    user.Email,
+                    user.DisplayName,
+                    user.AvatarUrl,
+                    Role = user.Role.Name.ToString()
+                }
+            });
+        }
+
     }
 }

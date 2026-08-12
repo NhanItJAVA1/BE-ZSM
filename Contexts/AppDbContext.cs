@@ -11,7 +11,8 @@ namespace BE_ZSM.Contexts
         }
 
         public DbSet<User> Users { get; set; }
-
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<Role> Roles { get; set; }
         public DbSet<Map> Maps { get; set; }
 
         public DbSet<Vehicle> Vehicles { get; set; }
@@ -32,13 +33,24 @@ namespace BE_ZSM.Contexts
                 .HasIndex(u => u.Email)
                 .IsUnique();
 
-            modelBuilder.Entity<Map>()
-                .HasIndex(m => m.Slug)
-                .IsUnique();
+            modelBuilder.Entity<Role>()
+                .Property(r => r.Name)
+                .HasConversion<int>();
 
-            modelBuilder.Entity<Vehicle>()
-                .HasIndex(v => v.Slug)
-                .IsUnique();
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.Role)
+                .WithMany(r => r.Users)
+                .HasForeignKey(u => u.RoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Role>()
+                .Property(r => r.Id)
+                .ValueGeneratedNever();
+
+            modelBuilder.Entity<Role>().HasData(
+                new Role { Id = 2, Name = Enums.UserRole.Admin, Description = "Administrator" },
+                new Role { Id = 1, Name = Enums.UserRole.User, Description = "Regular User" }
+                );
         }
     }
 }

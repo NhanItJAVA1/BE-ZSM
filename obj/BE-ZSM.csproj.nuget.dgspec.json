@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Application\\Intern-C#\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj": {}
+    "C:\\Application\\Intern-CSharp\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj": {}
   },
   "projects": {
-    "C:\\Application\\Intern-C#\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj": {
+    "C:\\Application\\Intern-CSharp\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Application\\Intern-C#\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj",
+        "projectUniqueName": "C:\\Application\\Intern-CSharp\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj",
         "projectName": "BE-ZSM",
-        "projectPath": "C:\\Application\\Intern-C#\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj",
+        "projectPath": "C:\\Application\\Intern-CSharp\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\BE-ZSM.csproj",
         "packagesPath": "C:\\Users\\nhant\\.nuget\\packages\\",
-        "outputPath": "C:\\Application\\Intern-C#\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\obj\\",
+        "outputPath": "C:\\Application\\Intern-CSharp\\BE-Source-ZSM\\BE-ZSM\\BE-ZSM\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -110,7 +110,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.303/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.AspNetCore": "(,10.0.32767]",
             "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",

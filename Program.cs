@@ -27,8 +27,6 @@ public partial class Program
 
         builder.Services.AddControllers();
 
-        builder.Services.AddOpenApi();
-
         builder.Services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(
                 builder.Configuration.GetConnectionString("DefaultConnection")
@@ -59,7 +57,7 @@ public partial class Program
             });
 
         builder.Services.AddAuthorization();
-
+        builder.Services.AddScoped<JwtService>();
         builder.Services.AddEndpointsApiExplorer();
 
         // Swagger + JWT
@@ -88,6 +86,7 @@ public partial class Program
         builder.Services.AddScoped<JwtService>();
         builder.Services.AddScoped<RecordHelper>();
         builder.Services.AddScoped<DbSaveHelper>();
+        builder.Services.AddScoped<RecordMapperHelper>();
         builder.Services.AddSingleton<IAmazonS3>(_ =>
             new AmazonS3Client(
                 new BasicAWSCredentials(awsAccessKeyId, awsSecretAccessKey),

@@ -24,16 +24,23 @@ namespace BE_ZSM.Controllers
         [HttpGet]
         public async Task<IActionResult> GetGameModes()
         {
-            var gameModes = await _context.GameModes
-                .Select(g => new
-                {
-                    g.Id,
-                    g.Name,
-                    g.Description
-                })
-                .ToListAsync();
+            try
+            {
+                var gameModes = await _context.GameModes
+                    .Select(g => new
+                    {
+                        g.Id,
+                        g.Name,
+                        g.Description
+                    })
+                    .ToListAsync();
 
-            return Ok(gameModes);
+                return Ok(gameModes);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            }
         }
 
         // GET: api/GameModes/{id}

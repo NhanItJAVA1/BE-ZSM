@@ -2,6 +2,8 @@
 using BE_ZSM.DTOs.Maps;
 using BE_ZSM.Entities;
 using BE_ZSM.Helpers;
+using BE_ZSM.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,29 +15,41 @@ namespace BE_ZSM.Controllers
     {
         private readonly AppDbContext _context;
         private readonly DbSaveHelper _dbSaveHelper;
+        private readonly S3PresignedUrlService _presignedUrlService;
 
-        public MapsController(AppDbContext context, DbSaveHelper dbSaveHelper)
+        public MapsController(AppDbContext context, DbSaveHelper dbSaveHelper, S3PresignedUrlService presignedUrlService)
         {
             _context = context;
             _dbSaveHelper = dbSaveHelper;
+            _presignedUrlService = presignedUrlService;
         }
 
         // GET: api/Maps
         [HttpGet]
         public async Task<IActionResult> GetMaps()
         {
-            var maps = await _context.Maps
-                .Select(m => new
+            try
+            {
+                var maps = await _context.Maps               
+                    .ToListAsync();
+
+                var result = maps.Select(m => new
                 {
                     m.Id,
                     m.Name,
-                    m.Slug,
-                    m.ImageUrl,
+                    m.Rate,
+                    ImageUrl = string.IsNullOrWhiteSpace(m.ImageUrl)?null:_presignedUrlService.CreateGetUrl(
+                        _presignedUrlService.GetObjectKeyFromUrl(m.ImageUrl)
+                        ),
                     m.CreatedAt
-                })
-                .ToListAsync();
+                });
 
-            return Ok(maps);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            }
         }
 
         // GET: api/Maps/{id}
@@ -48,8 +62,10 @@ namespace BE_ZSM.Controllers
                 {
                     m.Id,
                     m.Name,
-                    m.Slug,
-                    m.ImageUrl,
+                    m.Rate,
+                    ImageUrl = string.IsNullOrWhiteSpace(m.ImageUrl)?null:_presignedUrlService.CreateGetUrl(
+                        _presignedUrlService.GetObjectKeyFromUrl(m.ImageUrl)
+                        ),
                     m.CreatedAt
                 })
                 .FirstOrDefaultAsync();
@@ -67,12 +83,14 @@ namespace BE_ZSM.Controllers
 
         // POST: api/Maps
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateMap(CreateMapDto dto)
         {
+            var imageKey =  $"catalog/images/maps/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}.jpg";
             var map = new Map
             {
                 Name = dto.Name,
-                Slug = dto.Slug,
+                Rate = dto.Rate,
                 ImageUrl = dto.ImageUrl,
                 CreatedAt = DateTime.UtcNow
             };
@@ -97,6 +115,7 @@ namespace BE_ZSM.Controllers
 
         // PUT: api/Maps/{id}
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateMap(
             int id,
             UpdateMapDto dto)
@@ -113,7 +132,7 @@ namespace BE_ZSM.Controllers
             }
 
             map.Name = dto.Name;
-            map.Slug = dto.Slug;
+            map.Rate = dto.Rate;
             map.ImageUrl = dto.ImageUrl;
 
             var saveError = await _dbSaveHelper.TrySaveChangesAsync();
@@ -129,7 +148,7 @@ namespace BE_ZSM.Controllers
             {
                 map.Id,
                 map.Name,
-                map.Slug,
+                map.Rate,
                 map.ImageUrl,
                 map.CreatedAt
             });
@@ -137,6 +156,7 @@ namespace BE_ZSM.Controllers
 
         // DELETE: api/Maps/{id}
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteMap(int id)
         {
             var map = await _context.Maps
