@@ -17,3 +17,6 @@ appsettings.Development.json
 
 # Logs
 *.log
+
+# backups
+ZSM.bak
