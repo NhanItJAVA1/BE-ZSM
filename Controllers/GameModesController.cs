@@ -20,7 +20,6 @@ namespace BE_ZSM.Controllers
             _dbSaveHelper = dbSaveHelper;
         }
 
-        // GET: api/GameModes
         [HttpGet]
         public async Task<IActionResult> GetGameModes()
         {
@@ -43,7 +42,6 @@ namespace BE_ZSM.Controllers
             }
         }
 
-        // GET: api/GameModes/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetGameMode(int id)
         {
@@ -68,7 +66,6 @@ namespace BE_ZSM.Controllers
             return Ok(gameMode);
         }
 
-        // POST: api/GameModes
         [HttpPost]
         public async Task<IActionResult> CreateGameMode(
             CreateGameModeDto dto)
@@ -97,7 +94,6 @@ namespace BE_ZSM.Controllers
             );
         }
 
-        // PUT: api/GameModes/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateGameMode(
             int id,
@@ -134,7 +130,6 @@ namespace BE_ZSM.Controllers
             });
         }
 
-        // DELETE: api/GameModes/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteGameMode(int id)
         {

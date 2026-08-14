@@ -1,13 +1,18 @@
 using BE_ZSM.DTOs.Records;
 using BE_ZSM.Entities;
+using BE_ZSM.Services;
 
 namespace BE_ZSM.Helpers
 {
-    /// <summary>
-    /// Helper to map Record entity to RecordResponseDto
-    /// </summary>
     public class RecordMapperHelper
     {
+        private readonly S3PresignedUrlService _presignedUrlService;
+
+        public RecordMapperHelper(S3PresignedUrlService presignedUrlService)
+        {
+            _presignedUrlService = presignedUrlService;
+        }
+
         public RecordResponseDto? MapToResponseDto(Record? record)
         {
             if (record == null)
@@ -17,11 +22,16 @@ namespace BE_ZSM.Helpers
             {
                 Id = record.Id,
                 Title = record.Title,
-                VideoUrl = record.VideoUrl,
-                ThumbnailUrl = record.ThumbnailUrl,
+                VideoUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(
+                        record.VideoUrl,
+                        expiresMinutes: 60)
+                    ?? record.VideoUrl,
+                ThumbnailUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(record.ThumbnailUrl),
                 FinishTime = record.FinishTime.TotalSeconds,
                 Description = record.Description,
                 Views = record.Views,
+                Status = record.Status,
+                RejectReason = record.RejectReason,
                 CreatedAt = record.CreatedAt,
                 UpdatedAt = record.UpdatedAt,
                 User = record.User != null ? new UserMinimalDto
@@ -35,7 +45,7 @@ namespace BE_ZSM.Helpers
                     Id = record.Map.Id,
                     Name = record.Map.Name,
                     Rate = record.Map.Rate.ToString(),
-                    ImageUrl = record.Map.ImageUrl
+                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(record.Map.ImageUrl)
                 } : null,
                 Vehicle = record.Vehicle != null ? new VehicleMinimalDto
                 {
@@ -43,7 +53,7 @@ namespace BE_ZSM.Helpers
                     Name = record.Vehicle.Name,
                     Rank = record.Vehicle.Rank,
                     Type = record.Vehicle.Type,
-                    ImageUrl = record.Vehicle.ImageUrl
+                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(record.Vehicle.ImageUrl)
                 } : null,
                 GameMode = record.GameMode != null ? new GameModeMinimalDto
                 {

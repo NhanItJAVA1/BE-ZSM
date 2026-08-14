@@ -1,4 +1,6 @@
-﻿namespace BE_ZSM.Entities
+﻿using BE_ZSM.Enums;
+
+namespace BE_ZSM.Entities
 {
     public class Record
     {
@@ -27,6 +29,14 @@
         public DateTime CreatedAt { get; set; }
 
         public DateTime UpdatedAt { get; set; }
+
+        public RecordStatus Status { get; set; } = RecordStatus.Pending;
+
+        public string? RejectReason { get; set; }
+
+        public DateTime? ReviewedAt { get; set; }
+
+        public int? ReviewedBy { get; set; }
 
 
         // Navigation Properties

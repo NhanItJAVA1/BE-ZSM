@@ -148,6 +148,17 @@ namespace BE_ZSM.Services
 
             return _s3Client.GetPreSignedURL(request);
         }
+
+        public string? CreateGetUrlFromStoredUrl(string? storedUrl, int expiresMinutes = 15)
+        {
+            if (string.IsNullOrWhiteSpace(storedUrl))
+            {
+                return null;
+            }
+
+            return CreateGetUrl(GetObjectKeyFromUrl(storedUrl), expiresMinutes);
+        }
+
         public string GetObjectKeyFromUrl(string url){
             var uri = new Uri(url);
             return uri.AbsolutePath.TrimStart('/');

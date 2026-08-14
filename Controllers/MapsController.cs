@@ -38,9 +38,7 @@ namespace BE_ZSM.Controllers
                     m.Id,
                     m.Name,
                     m.Rate,
-                    ImageUrl = string.IsNullOrWhiteSpace(m.ImageUrl)?null:_presignedUrlService.CreateGetUrl(
-                        _presignedUrlService.GetObjectKeyFromUrl(m.ImageUrl)
-                        ),
+                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(m.ImageUrl),
                     m.CreatedAt
                 });
 
@@ -63,9 +61,7 @@ namespace BE_ZSM.Controllers
                     m.Id,
                     m.Name,
                     m.Rate,
-                    ImageUrl = string.IsNullOrWhiteSpace(m.ImageUrl)?null:_presignedUrlService.CreateGetUrl(
-                        _presignedUrlService.GetObjectKeyFromUrl(m.ImageUrl)
-                        ),
+                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(m.ImageUrl),
                     m.CreatedAt
                 })
                 .FirstOrDefaultAsync();

@@ -5,24 +5,16 @@ namespace BE_ZSM.Contexts
 {
     public class AppDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options)
-       : base(options)
-        {
-        }
-
+        public AppDbContext(DbContextOptions<AppDbContext> options):base(options){}
         public DbSet<User> Users { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<Map> Maps { get; set; }
-
         public DbSet<Vehicle> Vehicles { get; set; }
-
         public DbSet<GameMode> GameModes { get; set; }
-
         public DbSet<Record> Records { get; set; }
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
+        protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
 
             modelBuilder.Entity<User>()

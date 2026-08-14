@@ -27,7 +27,6 @@ namespace BE_ZSM.Controllers
             _dbSaveHelper = dbSaveHelper;
         }
 
-        // GET: api/Users
         [HttpGet]
         public async Task<IActionResult> GetUsers()
         {
@@ -48,7 +47,6 @@ namespace BE_ZSM.Controllers
             return Ok(users);
         }
 
-        // GET: api/Users/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetUser(int id)
         {
@@ -78,11 +76,9 @@ namespace BE_ZSM.Controllers
             return Ok(user);
         }
 
-        // POST: api/Users/register
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterUserDto dto)
         {
-            // Check username
             var usernameExists = await _context.Users
                 .AnyAsync(u => u.Username == dto.Username);
 
@@ -94,7 +90,6 @@ namespace BE_ZSM.Controllers
                 });
             }
 
-            // Check email
             var emailExists = await _context.Users
                 .AnyAsync(u => u.Email == dto.Email);
 
@@ -106,7 +101,6 @@ namespace BE_ZSM.Controllers
                 });
             }
 
-            // Hash password
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
             var userRole = await _context.Roles
@@ -159,7 +153,6 @@ namespace BE_ZSM.Controllers
             );
         }
 
-        // POST: api/Users/login
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginUserDto dto)
         {
@@ -229,7 +222,6 @@ namespace BE_ZSM.Controllers
             });
         }
 
-        // PUT: api/Users/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateUser(
             int id,
@@ -247,7 +239,6 @@ namespace BE_ZSM.Controllers
                 });
             }
 
-            // Check email
             var emailExists = await _context.Users
                 .AnyAsync(u =>
                     u.Email == dto.Email &&
@@ -288,7 +279,6 @@ namespace BE_ZSM.Controllers
             });
         }
 
-        // DELETE: api/Users/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteUser(int id)
         {
@@ -317,7 +307,6 @@ namespace BE_ZSM.Controllers
             return NoContent();
         }
 
-        //POST : api/Users/refresh-token
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
         {

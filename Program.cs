@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using System.Security.Claims;
 using System.Text;
 
 public partial class Program
@@ -15,52 +16,87 @@ public partial class Program
     private static void Main(string[] args)
     {
         LoadEnvironmentVariables();
-
-        var awsAccessKeyId = Environment.GetEnvironmentVariable("ACCESS_KEY_ID")
-            ?? throw new InvalidOperationException("ACCESS_KEY_ID is missing.");
-        var awsSecretAccessKey = Environment.GetEnvironmentVariable("SECRET_ACCESS_KEY")
-            ?? throw new InvalidOperationException("SECRET_ACCESS_KEY is missing.");
-        var awsRegion = Environment.GetEnvironmentVariable("AWS_REGION")
-            ?? throw new InvalidOperationException("AWS_REGION is missing.");
-
         var builder = WebApplication.CreateBuilder(args);
+
+        var awsAccessKeyId = GetRequiredEnvironmentVariable("ACCESS_KEY_ID");
+        var awsSecretAccessKey = GetRequiredEnvironmentVariable("SECRET_ACCESS_KEY");
+        var awsRegion = GetRequiredEnvironmentVariable("AWS_REGION");
 
         builder.Services.AddControllers();
 
+
+        var connectionString =
+            builder.Configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:DefaultConnection is missing."
+            );
+
         builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(
-                builder.Configuration.GetConnectionString("DefaultConnection")
-            )
+            options.UseSqlServer(connectionString)
         );
 
-        // JWT Authentication
+        var jwtIssuer = GetRequiredEnvironmentVariable("JWT_ISSUER");
+        var jwtAudience = GetRequiredEnvironmentVariable("JWT_AUDIENCE");
+        var jwtKey = GetRequiredEnvironmentVariable("JWT_KEY");
+
         builder.Services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = new TokenValidationParameters
+                options.TokenValidationParameters = new TokenValidationParameters       
                 {
                     ValidateIssuer = true,
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
 
-                    ValidIssuer = builder.Configuration["Jwt:Issuer"],
-                    ValidAudience = builder.Configuration["Jwt:Audience"],
+                    ValidIssuer = jwtIssuer,
+                    ValidAudience = jwtAudience,
 
                     IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(
-                            builder.Configuration["Jwt:Key"]!
-                        )
-                    )
+                        Encoding.UTF8.GetBytes(jwtKey)
+                    ),
+
+                    RoleClaimType = ClaimTypes.Role,
+                    NameClaimType = ClaimTypes.Name,
                 };
             });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorization(options =>
+        {
+            options.AddPolicy("AdminOnly", policy =>
+                policy.RequireAssertion(context =>
+                {
+                    var user = context.User;
+                    string[] adminRoles = ["Admin", "ADMIN", "admin"];
+
+                    return adminRoles.Any(role => user.IsInRole(role))
+                        || user.Claims.Any(claim =>
+                            (claim.Type == ClaimTypes.Role || claim.Type == "role")
+                            && adminRoles.Any(role =>
+                                string.Equals(claim.Value, role, StringComparison.OrdinalIgnoreCase)));
+                }));
+        });
+
         builder.Services.AddScoped<JwtService>();
+        builder.Services.AddScoped<RecordHelper>();
+        builder.Services.AddScoped<DbSaveHelper>();
+        builder.Services.AddScoped<RecordMapperHelper>();
+        builder.Services.AddScoped<AdminAccessHelper>();
+        builder.Services.AddScoped<S3PresignedUrlService>();
+
+        builder.Services.AddSingleton<IAmazonS3>(_ =>
+            new AmazonS3Client(
+                new BasicAWSCredentials(
+                    awsAccessKeyId,
+                    awsSecretAccessKey
+                ),
+                Amazon.RegionEndpoint.GetBySystemName(awsRegion)
+            )
+        );
+
         builder.Services.AddEndpointsApiExplorer();
 
-        // Swagger + JWT
         builder.Services.AddSwaggerGen(options =>
         {
             options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -77,22 +113,15 @@ public partial class Program
                 new OpenApiSecurityRequirement
                 {
                     {
-                        new OpenApiSecuritySchemeReference("Bearer", document),
+                        new OpenApiSecuritySchemeReference(
+                            "Bearer",
+                            document
+                        ),
                         new List<string>()
                     }
-                });
+                }
+            );
         });
-
-        builder.Services.AddScoped<JwtService>();
-        builder.Services.AddScoped<RecordHelper>();
-        builder.Services.AddScoped<DbSaveHelper>();
-        builder.Services.AddScoped<RecordMapperHelper>();
-        builder.Services.AddSingleton<IAmazonS3>(_ =>
-            new AmazonS3Client(
-                new BasicAWSCredentials(awsAccessKeyId, awsSecretAccessKey),
-                Amazon.RegionEndpoint.GetBySystemName(awsRegion)));
-        builder.Services.AddScoped<S3PresignedUrlService>();
-
         var app = builder.Build();
 
         if (app.Environment.IsDevelopment())
@@ -102,15 +131,20 @@ public partial class Program
         }
 
         app.UseHttpsRedirection();
-
         app.UseAuthentication();
         app.UseAuthorization();
-
         app.MapControllers();
 
         app.Run();
     }
 
+    private static string GetRequiredEnvironmentVariable(string key)
+    {
+        return Environment.GetEnvironmentVariable(key)
+            ?? throw new InvalidOperationException(
+                $"{key} is missing."
+            );
+    }
     private static void LoadEnvironmentVariables()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -118,6 +152,7 @@ public partial class Program
         while (directory != null)
         {
             var envPath = Path.Combine(directory.FullName, ".env");
+
             if (File.Exists(envPath))
             {
                 Env.Load(envPath);

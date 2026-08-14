@@ -32,6 +32,8 @@ services:
 
       JWT_ISSUER: ${JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE}
+      JWT_KEY: ${JWT_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
 
     depends_on:
       - sqlserver
