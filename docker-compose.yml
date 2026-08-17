@@ -1,14 +1,14 @@
 services:
 
   sqlserver:
-  image: mcr.microsoft.com/mssql/server:2022-latest
-  container_name: zsm-sqlserver
-  environment:
-    ACCEPT_EULA: "Y"
-    MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-  volumes:
-    - sqlserver_data:/var/opt/mssql
-  restart: unless-stopped
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: zsm-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    restart: unless-stopped
 
   be-zsm:
     build:
@@ -18,13 +18,13 @@ services:
     ports:
       - "8080:8080"
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
+
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=ZSM;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
-      
+
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME}
       AWS_REGION: ${AWS_REGION}
-
       ACCESS_KEY_ID: ${ACCESS_KEY_ID}
       SECRET_ACCESS_KEY: ${SECRET_ACCESS_KEY}
 
