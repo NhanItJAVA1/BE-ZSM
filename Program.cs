@@ -2,7 +2,13 @@ using Amazon.Runtime;
 using Amazon.S3;
 using BE_ZSM.Contexts;
 using BE_ZSM.Helpers;
+using BE_ZSM.Middlewares;
+using BE_ZSM.Repositories;
+using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services;
+using BE_ZSM.Services.Interfaces;
+using BE_ZSM.Services.Vehicle;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -84,6 +90,20 @@ public partial class Program
         builder.Services.AddScoped<RecordMapperHelper>();
         builder.Services.AddScoped<AdminAccessHelper>();
         builder.Services.AddScoped<S3PresignedUrlService>();
+        builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+        builder.Services.AddProblemDetails();
+        builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
+        builder.Services.AddScoped<IVehicleService, VehicleService>();
+        builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IRecordRepository,RecordRepository>();
+        builder.Services.AddScoped<IRecordService,RecordService>();
+        builder.Services.AddScoped<IMapRepository, MapRepository>();
+        builder.Services.AddScoped<IMapService, MapService>();
+        builder.Services.AddScoped<IGameModeRepository,GameModeRepository>();
+        builder.Services.AddScoped<IGameModeService,GameModeService>();
 
         builder.Services.AddSingleton<IAmazonS3>(_ =>
             new AmazonS3Client(
@@ -130,6 +150,7 @@ public partial class Program
             app.UseSwaggerUI();
         }
 
+        app.UseExceptionHandler();
         app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();

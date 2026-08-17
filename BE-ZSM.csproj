@@ -25,9 +25,7 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
-    <Folder Include="Middlewares\" />
     <Folder Include="Configurations\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
   <ItemGroup>

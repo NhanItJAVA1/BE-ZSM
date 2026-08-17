@@ -1,183 +1,69 @@
-﻿using BE_ZSM.Contexts;
-using BE_ZSM.DTOs.Maps;
-using BE_ZSM.Entities;
-using BE_ZSM.Helpers;
-using BE_ZSM.Services;
+﻿using BE_ZSM.DTOs.Maps;
+using BE_ZSM.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace BE_ZSM.Controllers
+namespace BE_ZSM.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class MapsController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class MapsController : ControllerBase
+    private readonly IMapService _mapService;
+
+    public MapsController(IMapService mapService)
     {
-        private readonly AppDbContext _context;
-        private readonly DbSaveHelper _dbSaveHelper;
-        private readonly S3PresignedUrlService _presignedUrlService;
+        _mapService = mapService;
+    }
 
-        public MapsController(AppDbContext context, DbSaveHelper dbSaveHelper, S3PresignedUrlService presignedUrlService)
-        {
-            _context = context;
-            _dbSaveHelper = dbSaveHelper;
-            _presignedUrlService = presignedUrlService;
-        }
+    [HttpGet]
+    public async Task<IActionResult> GetMaps()
+    {
+        var maps = await _mapService.GetMapsAsync();
 
-        // GET: api/Maps
-        [HttpGet]
-        public async Task<IActionResult> GetMaps()
-        {
-            try
-            {
-                var maps = await _context.Maps               
-                    .ToListAsync();
+        return Ok(maps);
+    }
 
-                var result = maps.Select(m => new
-                {
-                    m.Id,
-                    m.Name,
-                    m.Rate,
-                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(m.ImageUrl),
-                    m.CreatedAt
-                });
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetMap(int id)
+    {
+        var map = await _mapService.GetMapAsync(id);
 
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
-            }
-        }
+        return Ok(map);
+    }
 
-        // GET: api/Maps/{id}
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetMap(int id)
-        {
-            var map = await _context.Maps
-                .Where(m => m.Id == id)
-                .Select(m => new
-                {
-                    m.Id,
-                    m.Name,
-                    m.Rate,
-                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(m.ImageUrl),
-                    m.CreatedAt
-                })
-                .FirstOrDefaultAsync();
+    [Authorize(Roles = "Admin")]
+    [HttpPost]
+    public async Task<IActionResult> CreateMap(
+        [FromBody] CreateMapDto dto)
+    {
+        var map = await _mapService.CreateMapAsync(dto);
 
-            if (map == null)
-            {
-                return NotFound(new
-                {
-                    message = "Map not found"
-                });
-            }
+        return CreatedAtAction(
+            nameof(GetMap),
+            new { id = map.Id },
+            map);
+    }
 
-            return Ok(map);
-        }
+    [Authorize(Roles = "Admin")]
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateMap(
+        int id,
+        [FromBody] UpdateMapDto dto)
+    {
+        var map = await _mapService.UpdateMapAsync(
+            id,
+            dto);
 
-        // POST: api/Maps
-        [HttpPost]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> CreateMap(CreateMapDto dto)
-        {
-            var imageKey =  $"catalog/images/maps/{DateTime.UtcNow:yyyy/MM/dd}/{Guid.NewGuid():N}.jpg";
-            var map = new Map
-            {
-                Name = dto.Name,
-                Rate = dto.Rate,
-                ImageUrl = dto.ImageUrl,
-                CreatedAt = DateTime.UtcNow
-            };
+        return Ok(map);
+    }
 
-            _context.Maps.Add(map);
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteMap(int id)
+    {
+        await _mapService.DeleteMapAsync(id);
 
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return CreatedAtAction(
-                nameof(GetMap),
-                new { id = map.Id },
-                map
-            );
-        }
-
-        // PUT: api/Maps/{id}
-        [HttpPut("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdateMap(
-            int id,
-            UpdateMapDto dto)
-        {
-            var map = await _context.Maps
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (map == null)
-            {
-                return NotFound(new
-                {
-                    message = "Map not found"
-                });
-            }
-
-            map.Name = dto.Name;
-            map.Rate = dto.Rate;
-            map.ImageUrl = dto.ImageUrl;
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return Ok(new
-            {
-                map.Id,
-                map.Name,
-                map.Rate,
-                map.ImageUrl,
-                map.CreatedAt
-            });
-        }
-
-        // DELETE: api/Maps/{id}
-        [HttpDelete("{id}")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> DeleteMap(int id)
-        {
-            var map = await _context.Maps
-                .FirstOrDefaultAsync(m => m.Id == id);
-
-            if (map == null)
-            {
-                return NotFound(new
-                {
-                    message = "Map not found"
-                });
-            }
-
-            _context.Maps.Remove(map);
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }

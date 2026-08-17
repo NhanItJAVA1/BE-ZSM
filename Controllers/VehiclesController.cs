@@ -3,6 +3,7 @@ using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Entities;
 using BE_ZSM.Helpers;
 using BE_ZSM.Services;
+using BE_ZSM.Services.Vehicle;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,173 +14,61 @@ namespace BE_ZSM.Controllers
     [Route("api/[controller]")]
     public class VehiclesController : ControllerBase
     {
-        private readonly AppDbContext _context;
-        private readonly DbSaveHelper _dbSaveHelper;
-        private readonly S3PresignedUrlService _presignedUrlService;
+        private readonly IVehicleService _vehicleService;
 
-        public VehiclesController(AppDbContext context, DbSaveHelper dbSaveHelper, S3PresignedUrlService presignedUrlService)
+        public VehiclesController(IVehicleService vehicleService)
         {
-            _context = context;
-            _dbSaveHelper = dbSaveHelper;
-            _presignedUrlService = presignedUrlService;
+            _vehicleService = vehicleService;
         }
 
-        // GET: api/Vehicles
         [HttpGet]
         public async Task<IActionResult> GetVehicles()
         {
-            try
-            {
-                var vehicles = await _context.Vehicles
-                    .Select(v => new
-                    {
-                        v.Id,
-                        v.Name,
-                        v.Rank,
-                        v.Type,
-                        ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(v.ImageUrl),
-                        v.CreatedAt
-                    })
-                    .ToListAsync();
+            var vehicles = await _vehicleService.GetVehiclesAsync();
 
-                return Ok(vehicles);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
-            }
+            return Ok(vehicles);
         }
 
-        // GET: api/Vehicles/{id}
         [HttpGet("{id}")]
         public async Task<IActionResult> GetVehicle(int id)
         {
-            var vehicle = await _context.Vehicles
-                .Where(v => v.Id == id)
-                .Select(v => new
-                {
-                    v.Id,
-                    v.Name,
-                    v.Rank,
-                    v.Type,
-                    ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(v.ImageUrl),
-                    v.CreatedAt
-                })
-                .FirstOrDefaultAsync();
 
-            if (vehicle == null)
-            {
-                return NotFound(new
-                {
-                    message = "Vehicle not found"
-                });
-            }
+            var vehicle = await _vehicleService.GetVehicleAsync(id);
 
             return Ok(vehicle);
         }
 
-        // POST: api/Vehicles
         [HttpPost]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateVehicle(
             CreateVehicleDto dto)
         {
-            var vehicle = new Vehicle
-            {
-                Name = dto.Name,
-                Rank = dto.Rank,
-                Type = dto.Type,
-                ImageUrl = dto.ImageUrl,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.Vehicles.Add(vehicle);
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
+            var vehicle =
+            await _vehicleService.CreateVehicleAsync(dto);
 
             return CreatedAtAction(
                 nameof(GetVehicle),
                 new { id = vehicle.Id },
-                vehicle
-            );
+                vehicle);
         }
 
-        // PUT: api/Vehicles/{id}
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateVehicle(
             int id,
             UpdateVehicleDto dto)
         {
-            var vehicle = await _context.Vehicles
-                .FirstOrDefaultAsync(v => v.Id == id);
+            var vehicle =
+            await _vehicleService.UpdateVehicleAsync(id, dto);
 
-            if (vehicle == null)
-            {
-                return NotFound(new
-                {
-                    message = "Vehicle not found"
-                });
-            }
-
-            vehicle.Name = dto.Name;
-            vehicle.Rank = dto.Rank;
-            vehicle.Type = dto.Type;
-            vehicle.ImageUrl = dto.ImageUrl;
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return Ok(new
-            {
-                vehicle.Id,
-                vehicle.Name,
-                vehicle.Rank,
-                vehicle.Type,
-                vehicle.ImageUrl,
-                vehicle.CreatedAt
-            });
+            return Ok(vehicle);
         }
 
-        // DELETE: api/Vehicles/{id}
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteVehicle(int id)
         {
-            var vehicle = await _context.Vehicles
-                .FirstOrDefaultAsync(v => v.Id == id);
-
-            if (vehicle == null)
-            {
-                return NotFound(new
-                {
-                    message = "Vehicle not found"
-                });
-            }
-
-            _context.Vehicles.Remove(vehicle);
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
+            await _vehicleService.DeleteVehicleAsync(id);
 
             return NoContent();
         }

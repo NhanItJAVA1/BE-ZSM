@@ -1,46 +1,64 @@
 using BE_ZSM.Contexts;
+using BE_ZSM.Exceptions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
-namespace BE_ZSM.Helpers
+namespace BE_ZSM.Helpers;
+
+public class DbSaveHelper
 {
-    public class DbSaveHelper
+    private readonly AppDbContext _context;
+
+    public DbSaveHelper(AppDbContext context)
     {
-        private readonly AppDbContext _context;
+        _context = context;
+    }
 
-        public DbSaveHelper(AppDbContext context)
+    public async Task SaveChangesAsync()
+    {
+        try
         {
-            _context = context;
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            throw ConvertDatabaseException(ex);
+        }
+    }
+
+    private static Exception ConvertDatabaseException(
+        DbUpdateException ex)
+    {
+        if (ex.InnerException is SqlException sqlException)
+        {
+            return sqlException.Number switch
+            {
+                547 => new BadRequestException(
+                    "Database constraint violated.",
+                    "DATABASE_CONSTRAINT_VIOLATED"),
+
+                2601 => new BadRequestException(
+                    "Duplicate data exists in the database.",
+                    "DUPLICATE_DATA"),
+
+                2627 => new BadRequestException(
+                    "Duplicate data exists in the database.",
+                    "DUPLICATE_DATA"),
+
+                515 => new BadRequestException(
+                    "A required value is missing.",
+                    "REQUIRED_VALUE_MISSING"),
+
+                _ => new AppException(
+                    "Database update failed.",
+                    500,
+                    "DATABASE_UPDATE_FAILED")
+            };
         }
 
-        public async Task<string?> TrySaveChangesAsync()
-        {
-            try
-            {
-                await _context.SaveChangesAsync();
-                return null;
-            }
-            catch (DbUpdateException ex)
-            {
-                return GetDatabaseErrorMessage(ex);
-            }
-        }
-
-        private static string GetDatabaseErrorMessage(DbUpdateException ex)
-        {
-            if (ex.InnerException is SqlException sqlException)
-            {
-                return sqlException.Number switch
-                {
-                    547 => "Database constraint violated.",
-                    2601 => "Duplicate data exists in the database.",
-                    2627 => "Duplicate data exists in the database.",
-                    515 => "A required value is missing.",
-                    _ => $"Database update failed: {sqlException.Message}"
-                };
-            }
-
-            return $"Database update failed: {ex.InnerException?.Message ?? ex.Message}";
-        }
+        return new AppException(
+            "Database update failed.",
+            500,
+            "DATABASE_UPDATE_FAILED");
     }
 }

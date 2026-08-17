@@ -16,7 +16,6 @@ namespace BE_ZSM.Controllers
             _s3PresignedUrlService = s3PresignedUrlService;
         }
 
-        // POST: api/Catalog/image-upload-url
         [Authorize(Roles = "Admin")]
         [HttpPost("image-upload-url")]
         public ActionResult<CatalogImageUploadResponseDto> CreateImageUploadUrl(

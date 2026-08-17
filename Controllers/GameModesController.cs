@@ -1,161 +1,70 @@
-﻿using BE_ZSM.Contexts;
-using BE_ZSM.DTOs.GameModes;
-using BE_ZSM.Entities;
-using BE_ZSM.Helpers;
+﻿using BE_ZSM.DTOs.GameModes;
+using BE_ZSM.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace BE_ZSM.Controllers
+namespace BE_ZSM.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class GameModesController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class GameModesController : ControllerBase
+    private readonly IGameModeService _gameModeService;
+
+    public GameModesController(
+        IGameModeService gameModeService)
     {
-        private readonly AppDbContext _context;
-        private readonly DbSaveHelper _dbSaveHelper;
+        _gameModeService = gameModeService;
+    }
 
-        public GameModesController(AppDbContext context, DbSaveHelper dbSaveHelper)
-        {
-            _context = context;
-            _dbSaveHelper = dbSaveHelper;
-        }
+    [HttpGet]
+    public async Task<IActionResult> GetGameModes()
+    {
+        var gameModes =
+            await _gameModeService.GetGameModesAsync();
 
-        [HttpGet]
-        public async Task<IActionResult> GetGameModes()
-        {
-            try
-            {
-                var gameModes = await _context.GameModes
-                    .Select(g => new
-                    {
-                        g.Id,
-                        g.Name,
-                        g.Description
-                    })
-                    .ToListAsync();
+        return Ok(gameModes);
+    }
 
-                return Ok(gameModes);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
-            }
-        }
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetGameMode(int id)
+    {
+        var gameMode =
+            await _gameModeService.GetGameModeAsync(id);
 
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetGameMode(int id)
-        {
-            var gameMode = await _context.GameModes
-                .Where(g => g.Id == id)
-                .Select(g => new
-                {
-                    g.Id,
-                    g.Name,
-                    g.Description
-                })
-                .FirstOrDefaultAsync();
+        return Ok(gameMode);
+    }
 
-            if (gameMode == null)
-            {
-                return NotFound(new
-                {
-                    message = "Game mode not found"
-                });
-            }
+    [HttpPost]
+    public async Task<IActionResult> CreateGameMode(
+        [FromBody] CreateGameModeDto dto)
+    {
+        var gameMode =
+            await _gameModeService.CreateGameModeAsync(dto);
 
-            return Ok(gameMode);
-        }
+        return CreatedAtAction(
+            nameof(GetGameMode),
+            new { id = gameMode.Id },
+            gameMode);
+    }
 
-        [HttpPost]
-        public async Task<IActionResult> CreateGameMode(
-            CreateGameModeDto dto)
-        {
-            var gameMode = new GameMode
-            {
-                Name = dto.Name,
-                Description = dto.Description
-            };
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateGameMode(
+        int id,
+        [FromBody] UpdateGameModeDto dto)
+    {
+        var gameMode =
+            await _gameModeService.UpdateGameModeAsync(
+                id,
+                dto);
 
-            _context.GameModes.Add(gameMode);
+        return Ok(gameMode);
+    }
 
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteGameMode(int id)
+    {
+        await _gameModeService.DeleteGameModeAsync(id);
 
-            return CreatedAtAction(
-                nameof(GetGameMode),
-                new { id = gameMode.Id },
-                gameMode
-            );
-        }
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateGameMode(
-            int id,
-            UpdateGameModeDto dto)
-        {
-            var gameMode = await _context.GameModes
-                .FirstOrDefaultAsync(g => g.Id == id);
-
-            if (gameMode == null)
-            {
-                return NotFound(new
-                {
-                    message = "Game mode not found"
-                });
-            }
-
-            gameMode.Name = dto.Name;
-            gameMode.Description = dto.Description;
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return Ok(new
-            {
-                gameMode.Id,
-                gameMode.Name,
-                gameMode.Description
-            });
-        }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteGameMode(int id)
-        {
-            var gameMode = await _context.GameModes
-                .FirstOrDefaultAsync(g => g.Id == id);
-
-            if (gameMode == null)
-            {
-                return NotFound(new
-                {
-                    message = "Game mode not found"
-                });
-            }
-
-            _context.GameModes.Remove(gameMode);
-
-            var saveError = await _dbSaveHelper.TrySaveChangesAsync();
-            if (saveError != null)
-            {
-                return BadRequest(new
-                {
-                    message = saveError
-                });
-            }
-
-            return NoContent();
-        }
+        return NoContent();
     }
 }
