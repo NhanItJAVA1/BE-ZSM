@@ -11,8 +11,7 @@ namespace BE_ZSM.Repositories.Vehicle
 
         Task<VehicleEntity?> GetEntityByIdAsync(int id);
 
-        Task<List<VehicleEntity>> GetByIdsAsync(
-            List<int> vehicleIds);
+        Task<List<VehicleEntity>> GetByIdsAsync(List<int> vehicleIds);
 
         Task AddAsync(VehicleEntity vehicle);
 
