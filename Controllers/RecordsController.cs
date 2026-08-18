@@ -3,12 +3,15 @@ using BE_ZSM.Entities;
 using BE_ZSM.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Prometheus;
 
 [ApiController]
 [Route("api/[controller]")]
 public class RecordsController : ControllerBase
 {
     private readonly IRecordService _recordService;
+    private static readonly Counter VideoUploadCounter = Metrics
+        .CreateCounter("zsm_video_uploads_total", "Tổng số lượt tạo URL upload video S3");
 
     public RecordsController(IRecordService recordService)
     {
@@ -80,6 +83,9 @@ public class RecordsController : ControllerBase
     {
         var result =
             await _recordService.UploadVideoAsync(form);
+
+        // Increment the Prometheus counter for video uploads
+        VideoUploadCounter.Inc();
 
         return Ok(result);
     }

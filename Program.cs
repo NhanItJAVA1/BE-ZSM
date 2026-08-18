@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Prometheus;
 using System.Security.Claims;
 using System.Text;
 
@@ -84,6 +85,16 @@ public partial class Program
                 }));
         });
 
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAll", policy =>
+            {
+                policy.AllowAnyOrigin()
+                      .AllowAnyMethod()
+                      .AllowAnyHeader();
+            });
+        });
+
         builder.Services.AddScoped<JwtService>();
         builder.Services.AddScoped<RecordHelper>();
         builder.Services.AddScoped<DbSaveHelper>();
@@ -144,6 +155,8 @@ public partial class Program
         });
         var app = builder.Build();
 
+        app.UseExceptionHandler();
+
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
@@ -152,9 +165,21 @@ public partial class Program
 
         app.UseExceptionHandler();
         app.UseHttpsRedirection();
+        app.UseRouting();
+
+        app.UseHttpMetrics();
+        app.UseCors("AllowAll");
+
         app.UseAuthentication();
         app.UseAuthorization();
+
+        app.MapMetrics();
         app.MapControllers();
+
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapMetrics();
+        });
 
         app.Run();
     }

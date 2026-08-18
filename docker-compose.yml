@@ -1,5 +1,4 @@
 services:
-
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: zsm-sqlserver
@@ -11,9 +10,7 @@ services:
     restart: unless-stopped
 
   be-zsm:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: huynhtrongnhan98/zsm-backend:latest
     container_name: zsm-backend
     ports:
       - "8080:8080"
