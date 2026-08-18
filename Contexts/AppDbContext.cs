@@ -16,24 +16,34 @@ namespace BE_ZSM.Contexts
 
         protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasIndex(u => u.Username).IsUnique();
+                entity.HasIndex(u => u.Email).IsUnique();
 
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Username)
-                .IsUnique();
+                entity.HasOne(u => u.Role)
+                    .WithMany(r => r.Users)
+                    .HasForeignKey(u => u.RoleId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+            //modelBuilder.Entity<User>()
+            //    .HasIndex(u => u.Username)
+            //    .IsUnique();
 
-            modelBuilder.Entity<User>()
-                .HasIndex(u => u.Email)
-                .IsUnique();
+            //modelBuilder.Entity<User>()
+            //    .HasIndex(u => u.Email)
+            //    .IsUnique();
+            //modelBuilder.Entity<User>()
+            //    .HasOne(u => u.Role)
+            //    .WithMany(r => r.Users)
+            //    .HasForeignKey(u => u.RoleId)
+            //    .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Role>()
                 .Property(r => r.Name)
                 .HasConversion<int>();
 
-            modelBuilder.Entity<User>()
-                .HasOne(u => u.Role)
-                .WithMany(r => r.Users)
-                .HasForeignKey(u => u.RoleId)
-                .OnDelete(DeleteBehavior.Cascade);
+
 
             modelBuilder.Entity<Role>()
                 .Property(r => r.Id)

@@ -17,7 +17,7 @@ using Microsoft.OpenApi;
 using Prometheus;
 using System.Security.Claims;
 using System.Text;
-
+using Prometheus;
 public partial class Program
 {
     private static void Main(string[] args)
@@ -154,32 +154,30 @@ public partial class Program
             );
         });
         var app = builder.Build();
-
         app.UseExceptionHandler();
-
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
             app.UseSwaggerUI();
         }
 
-        app.UseExceptionHandler();
         app.UseHttpsRedirection();
         app.UseRouting();
 
-        app.UseHttpMetrics();
+        app.UseHttpMetrics(options =>
+        {
+            options.AddCustomLabel("host", context => context.Request.Host.Host);
+        });
+
         app.UseCors("AllowAll");
 
         app.UseAuthentication();
         app.UseAuthorization();
 
-        app.MapMetrics();
+        app.MapMetrics().AllowAnonymous();
         app.MapControllers();
 
-        app.UseEndpoints(endpoints =>
-        {
-            endpoints.MapMetrics();
-        });
+       
 
         app.Run();
     }
