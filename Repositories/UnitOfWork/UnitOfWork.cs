@@ -3,6 +3,7 @@ using BE_ZSM.Repositories.Interfaces;
 using BE_ZSM.Repositories.RefreshToken;
 using BE_ZSM.Repositories.Role;
 using BE_ZSM.Repositories.Vehicle;
+using BE_ZSM.Services.Cache;
 
 namespace BE_ZSM.Repositories.UnitOfWork
 {
@@ -22,7 +23,8 @@ namespace BE_ZSM.Repositories.UnitOfWork
         public IMapRepository Maps { get; }
 
         public IGameModeRepository GameModes { get; }
-        public UnitOfWork(AppDbContext context, IUserRepository users, IRoleRepository roles, IRefreshTokenRepository refreshTokens, IVehicleRepository vehicles, IRecordRepository records, IMapRepository maps, IGameModeRepository gameModes)
+        public ICacheService CacheService { get; }
+        public UnitOfWork(AppDbContext context, IUserRepository users, IRoleRepository roles, IRefreshTokenRepository refreshTokens, IVehicleRepository vehicles, IRecordRepository records, IMapRepository maps, IGameModeRepository gameModes, ICacheService cacheService)
         {
             _context = context;
             Users = users;
@@ -32,6 +34,7 @@ namespace BE_ZSM.Repositories.UnitOfWork
             Records = records;
             Maps = maps;
             GameModes = gameModes;
+            CacheService = cacheService;
         }
         public async Task<int> SaveChangesAsync()
         {

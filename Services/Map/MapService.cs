@@ -1,8 +1,10 @@
-﻿using AutoMapper;
+﻿using Amazon.Runtime.Internal.Util;
+using AutoMapper;
 using BE_ZSM.DTOs.Maps;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.UnitOfWork;
+using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Interfaces;
 
 namespace BE_ZSM.Services;
@@ -12,12 +14,16 @@ public class MapService : IMapService
     private readonly IUnitOfWork _unitOfWork;
     private readonly S3PresignedUrlService _presignedUrlService;
     private readonly IMapper _mapper;
+    private const string CacheKey = "maps:all";
+    private readonly ICacheService _cache;
 
     public MapService(
+        ICacheService cache,
         IUnitOfWork unitOfWork,
         S3PresignedUrlService presignedUrlService,
         IMapper mapper)
     {
+        _cache = cache;
         _unitOfWork = unitOfWork;
         _presignedUrlService = presignedUrlService;
         _mapper = mapper;
@@ -25,6 +31,13 @@ public class MapService : IMapService
 
     public async Task<List<MapResponseDto>> GetMapsAsync()
     {
+        var cached = await _cache.GetAsync<List<MapResponseDto>>(CacheKey);
+
+        if (cached != null)
+        {
+            return cached;
+        }
+
         var maps = await _unitOfWork.Maps.GetAllAsync();
 
         var responses = _mapper.Map<List<MapResponseDto>>(maps);
@@ -33,6 +46,8 @@ public class MapService : IMapService
         {
             response.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(response.ImageUrl);
         }
+        
+        await _cache.SetAsync(CacheKey, responses, TimeSpan.FromMinutes(30));
 
         return responses;
     }

@@ -20,6 +20,7 @@ namespace BE_ZSM.Repositories.UnitOfWork
         IMapRepository Maps { get; }
 
         IGameModeRepository GameModes { get; }
+
         Task<int> SaveChangesAsync();
     }
 }

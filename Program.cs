@@ -10,6 +10,7 @@ using BE_ZSM.Repositories.Role;
 using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services;
+using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Interfaces;
 using BE_ZSM.Services.Vehicle;
 using DotNetEnv;
@@ -120,6 +121,12 @@ public partial class Program
         builder.Services.AddScoped<IGameModeRepository,GameModeRepository>();
         builder.Services.AddScoped<IGameModeService,GameModeService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration =
+                builder.Configuration.GetConnectionString("Redis");
+        });
+        builder.Services.AddScoped<ICacheService, CacheService>();
         builder.Services.AddAutoMapper(
             cfg => { },
             typeof(MappingProfile)
@@ -166,15 +173,15 @@ public partial class Program
         });
         var app = builder.Build();
         app.UseExceptionHandler();
-        //if (app.Environment.IsDevelopment())
-        //{
-        //    app.UseSwagger();
-        //    app.UseSwaggerUI();
-        //}
-        app.UseSwagger();
-        app.UseSwaggerUI();
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+        //app.UseSwagger();
+        //app.UseSwaggerUI();
 
-        //app.UseHttpsRedirection();
+        app.UseHttpsRedirection();
         app.UseRouting();
 
         app.UseHttpMetrics(options =>

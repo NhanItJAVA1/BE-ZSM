@@ -1,17 +1,12 @@
 ﻿using AutoMapper;
-using BE_ZSM.DTOs.RefreshToken;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories.Interfaces;
-using BE_ZSM.Repositories.RefreshToken;
-using BE_ZSM.Repositories.Role;
 using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
 
 namespace BE_ZSM.Services;
-
 public class UserService : IUserService
 {
     private readonly IUnitOfWork _unitOfWork;
