@@ -1,43 +1,43 @@
-﻿using BE_ZSM.DTOs.RefreshToken;
+﻿using AutoMapper;
+using BE_ZSM.DTOs.RefreshToken;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.RefreshToken;
+using BE_ZSM.Repositories.Role;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
 
 namespace BE_ZSM.Services;
 
 public class UserService : IUserService
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly JwtService _jwtService;
+    private readonly IMapper _mapper;
 
     public UserService(
-        IUserRepository userRepository,
-        IRoleRepository roleRepository,
-        IRefreshTokenRepository refreshTokenRepository,
-        JwtService jwtService)
+        IUnitOfWork unitOfWork,
+        JwtService jwtService,
+        IMapper mapper)
     {
-        _userRepository = userRepository;
-        _roleRepository = roleRepository;
-        _refreshTokenRepository = refreshTokenRepository;
+        _unitOfWork = unitOfWork;
         _jwtService = jwtService;
+        _mapper = mapper;
     }
     public async Task<List<UserResponseDto>> GetUsersAsync()
     {
-        var users = await _userRepository.GetAllAsync();
+        var users = await _unitOfWork.Users.GetAllWithRoleAsync();
 
-        return users
-            .Select(MapToResponse)
-            .ToList();
+        return _mapper.Map<List<UserResponseDto>>(users);
+
     }
 
     public async Task<UserResponseDto> GetUserAsync(int id)
     {
-        var user = await _userRepository.GetByIdAsync(id);
+        var user = await _unitOfWork.Users.GetByIdWithRoleAsync(id);
 
         if (user == null)
         {
@@ -46,14 +46,14 @@ public class UserService : IUserService
                 "USER_NOT_FOUND");
         }
 
-        return MapToResponse(user);
+        return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task<UserResponseDto> RegisterAsync(
         RegisterUserDto dto)
     {
         var usernameExists =
-            await _userRepository.ExistsByUsernameAsync(
+            await _unitOfWork.Users.ExistsByUsernameAsync(
                 dto.Username);
 
         if (usernameExists)
@@ -65,7 +65,7 @@ public class UserService : IUserService
 
 
         var emailExists =
-            await _userRepository.ExistsByEmailAsync(
+            await _unitOfWork.Users.ExistsByEmailAsync(
                 dto.Email);
 
         if (emailExists)
@@ -75,9 +75,8 @@ public class UserService : IUserService
                 "EMAIL_ALREADY_EXISTS");
         }
 
-
         var userRole =
-            await _roleRepository.GetByNameAsync(
+            await _unitOfWork.Roles.GetByNameAsync(
                 UserRole.User);
 
         if (userRole == null)
@@ -88,41 +87,27 @@ public class UserService : IUserService
                 "DEFAULT_ROLE_NOT_FOUND");
         }
 
+        var user = _mapper.Map<User>(dto);
 
-        var passwordHash =
-            BCrypt.Net.BCrypt.HashPassword(
-                dto.Password);
+        user.PasswordHash =
+            BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
+        user.RoleId = userRole.Id;
+        user.Role = userRole;
 
-        var user = new User
-        {
-            Username = dto.Username,
-            Email = dto.Email,
-            PasswordHash = passwordHash,
-            DisplayName = dto.DisplayName,
-            AvatarUrl = dto.AvatarUrl,
+        user.CreatedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
 
-            RoleId = userRole.Id,
-            Role = userRole,
+        await _unitOfWork.Users.AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
 
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
-        };
-
-
-        await _userRepository.AddAsync(user);
-
-
-        await _userRepository.SaveChangesAsync();
-
-
-        return MapToResponse(user);
+        return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginUserDto dto)
     {
         var user =
-            await _userRepository.GetByUsernameAsync(
+            await _unitOfWork.Users.GetByUsernameAsync(
                 dto.Username);
 
         if (user == null)
@@ -131,7 +116,6 @@ public class UserService : IUserService
                 "Invalid username or password",
                 "INVALID_CREDENTIALS");
         }
-
 
         var passwordValid =
             BCrypt.Net.BCrypt.Verify(
@@ -145,44 +129,30 @@ public class UserService : IUserService
                 "INVALID_CREDENTIALS");
         }
 
-
-        var accessToken =
-            _jwtService.GenerateToken(user);
-
-
-        var refreshToken =
-            _jwtService.GenerateRefreshToken();
-
+        var accessToken = _jwtService.GenerateToken(user);
+        var refreshToken = _jwtService.GenerateRefreshToken();
 
         var refreshTokenEntity = new RefreshToken
         {
             UserId = user.Id,
             Token = refreshToken,
-            ExpiresAt =
-                _jwtService.GetRefreshTokenExpiration()
+            ExpiresAt = _jwtService.GetRefreshTokenExpiration()
         };
 
-
-        await _refreshTokenRepository
-            .AddAsync(refreshTokenEntity);
-
-
-        await _userRepository.SaveChangesAsync();
-
+        await _unitOfWork.RefreshTokens.AddAsync(refreshTokenEntity);
+        await _unitOfWork.SaveChangesAsync();
 
         return new LoginResponseDto
         {
             AccessToken = accessToken,
             RefreshToken = refreshToken,
-            User = MapToResponse(user)
+            User = _mapper.Map<UserResponseDto>(user)
         };
     }
 
     public async Task<UserResponseDto> UpdateAsync(int id,UpdateUserDto dto)
     {
-        var user =
-            await _userRepository.GetByIdAsync(id);
-
+        var user = await _unitOfWork.Users.GetByIdAsync(id);
         if (user == null)
         {
             throw new NotFoundException(
@@ -190,9 +160,8 @@ public class UserService : IUserService
                 "USER_NOT_FOUND");
         }
 
-
         var emailExists =
-            await _userRepository.ExistsByEmailAsync(
+            await _unitOfWork.Users.ExistsByEmailAsync(
                 dto.Email,
                 id);
 
@@ -203,20 +172,15 @@ public class UserService : IUserService
                 "EMAIL_ALREADY_EXISTS");
         }
 
-
-        user.Email = dto.Email;
-        user.DisplayName = dto.DisplayName;
-        user.AvatarUrl = dto.AvatarUrl;
-        user.UpdatedAt = DateTime.UtcNow;
-
-        await _userRepository.SaveChangesAsync();
-        return MapToResponse(user);
+        _unitOfWork.Users.Update(user);
+        await _unitOfWork.SaveChangesAsync();
+        return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task DeleteAsync(int id)
     {
         var user =
-            await _userRepository.GetByIdAsync(id);
+            await _unitOfWork.Users.GetByIdAsync(id);
 
         if (user == null)
         {
@@ -224,14 +188,14 @@ public class UserService : IUserService
                 "User not found",
                 "USER_NOT_FOUND");
         }
-        _userRepository.Delete(user);
-        await _userRepository.SaveChangesAsync();
+        _unitOfWork.Users.Delete(user);
+        await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<LoginResponseDto> RefreshTokenAsync(string token)
     {
         var refreshToken =
-            await _refreshTokenRepository.GetByTokenAsync(token);
+            await _unitOfWork.RefreshTokens.GetByTokenAsync(token);
 
         if (refreshToken == null ||
             refreshToken.RevokeAt != null ||
@@ -241,37 +205,15 @@ public class UserService : IUserService
                 "Invalid or expired refresh token",
                 "INVALID_REFRESH_TOKEN");
         }
-
-
         var user = refreshToken.User;
-
-
         var newAccessToken =
             _jwtService.GenerateToken(user);
-
 
         return new LoginResponseDto
         {
             AccessToken = newAccessToken,
-
             RefreshToken = refreshToken.Token,
-
-            User = MapToResponse(user)
+            User = _mapper.Map<UserResponseDto>(user)
         };
-    }
-
-    private static UserResponseDto MapToResponse(User user)
-    {
-        return new UserResponseDto
-        {
-            Id = user.Id,
-            Username = user.Username,
-            Email = user.Email,
-            DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
-            Role = user.Role.Name.ToString(),
-            CreatedAt = user.CreatedAt,
-            UpdatedAt = user.UpdatedAt
-        };
-    }
+    }    
 }

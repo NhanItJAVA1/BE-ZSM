@@ -5,6 +5,9 @@ using BE_ZSM.Helpers;
 using BE_ZSM.Middlewares;
 using BE_ZSM.Repositories;
 using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.RefreshToken;
+using BE_ZSM.Repositories.Role;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services;
 using BE_ZSM.Services.Interfaces;
@@ -15,9 +18,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Prometheus;
+using Prometheus;
 using System.Security.Claims;
 using System.Text;
-using Prometheus;
 public partial class Program
 {
     private static void Main(string[] args)
@@ -96,7 +99,6 @@ public partial class Program
         });
 
         builder.Services.AddScoped<JwtService>();
-        builder.Services.AddScoped<RecordHelper>();
         builder.Services.AddScoped<DbSaveHelper>();
         builder.Services.AddScoped<RecordMapperHelper>();
         builder.Services.AddScoped<AdminAccessHelper>();
@@ -111,10 +113,19 @@ public partial class Program
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IRecordRepository,RecordRepository>();
         builder.Services.AddScoped<IRecordService,RecordService>();
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IMapRepository, MapRepository>();
         builder.Services.AddScoped<IMapService, MapService>();
         builder.Services.AddScoped<IGameModeRepository,GameModeRepository>();
         builder.Services.AddScoped<IGameModeService,GameModeService>();
+        builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+        builder.Services.AddAutoMapper(
+            cfg => { },
+            typeof(MappingProfile)
+        );
+        builder.Services.AddScoped(typeof(IGenericRepository<>),
+                           typeof(GenericRepository<>));
 
         builder.Services.AddSingleton<IAmazonS3>(_ =>
             new AmazonS3Client(
@@ -155,13 +166,15 @@ public partial class Program
         });
         var app = builder.Build();
         app.UseExceptionHandler();
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
+        //if (app.Environment.IsDevelopment())
+        //{
+        //    app.UseSwagger();
+        //    app.UseSwaggerUI();
+        //}
+        app.UseSwagger();
+        app.UseSwaggerUI();
 
-        app.UseHttpsRedirection();
+        //app.UseHttpsRedirection();
         app.UseRouting();
 
         app.UseHttpMetrics(options =>

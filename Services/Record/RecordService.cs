@@ -1,8 +1,11 @@
-﻿using BE_ZSM.DTOs.Records;
+﻿using AutoMapper;
+using Azure;
+using BE_ZSM.DTOs.Records;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Helpers;
 using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services.Interfaces;
 using System.Security.Claims;
@@ -11,42 +14,58 @@ namespace BE_ZSM.Services;
 
 public class RecordService : IRecordService
 {
-    private readonly IRecordRepository _recordRepository;
-    private readonly RecordHelper _recordHelper;
-    private readonly RecordMapperHelper _recordMapperHelper;
     private readonly S3PresignedUrlService _s3PresignedUrlService;
     private readonly AdminAccessHelper _adminAccessHelper;
-    private readonly IVehicleRepository _vehicleRepository;
+    private readonly IMapper _mapper;
+    private readonly IUnitOfWork _unitOfWork;
 
     public RecordService(
-        IRecordRepository recordRepository,
-        RecordHelper recordHelper,
-        RecordMapperHelper recordMapperHelper,
         S3PresignedUrlService s3PresignedUrlService,
-        IVehicleRepository vehicleRepository,
-        AdminAccessHelper adminAccessHelper)
+        AdminAccessHelper adminAccessHelper,
+        IMapper mapper,
+        IUnitOfWork unitOfWork)
     {
-        _recordRepository = recordRepository;
-        _recordHelper = recordHelper;
-        _recordMapperHelper = recordMapperHelper;
         _s3PresignedUrlService = s3PresignedUrlService;
-        _vehicleRepository = vehicleRepository;
         _adminAccessHelper = adminAccessHelper;
+        _mapper = mapper;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<List<RecordResponseDto>> GetRecordsAsync()
     {
-        var records =
-            await _recordRepository.GetAllApprovedAsync();
+        var records = await _unitOfWork.Records.GetAllApprovedAsync();
 
-        return _recordMapperHelper
-            .MapToResponseDtos(records);
+        var responses = _mapper.Map<List<RecordResponseDto>>(records);
+        foreach (var response in responses)
+        {
+            response.VideoUrl =
+                _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                    response.VideoUrl);
+
+            response.ThumbnailUrl =
+                _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                    response.ThumbnailUrl);
+            if (response.Map != null)
+            {
+                response.Map.ImageUrl =
+                    _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                        response.Map.ImageUrl);
+            }
+
+            if (response.Vehicle != null)
+            {
+                response.Vehicle.ImageUrl =
+                    _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                        response.Vehicle.ImageUrl);
+            }
+        }
+
+        return responses;
     }
 
     public async Task<RecordResponseDto> GetRecordAsync(int id)
     {
-        var record =
-            await _recordRepository.GetByIdAsync(id);
+        var record = await _unitOfWork.Records.GetByIdAsync(id);
 
         if (record == null)
         {
@@ -55,38 +74,29 @@ public class RecordService : IRecordService
                 "RECORD_NOT_FOUND");
         }
 
-        return _recordMapperHelper
-            .MapToResponseDto(record);
+        return _mapper.Map<RecordResponseDto>(record);
     }
 
-    public async Task<List<RecordResponseDto>> GetRecordsByUserAsync(
-        int userId)
+    public async Task<List<RecordResponseDto>> GetRecordsByUserAsync(int userId)
     {
-        var records =
-            await _recordRepository.GetByUserIdAsync(userId);
+        var records = await _unitOfWork.Records.GetByUserIdAsync(userId);
 
-        return _recordMapperHelper
-            .MapToResponseDtos(records);
+        return _mapper.Map<List<RecordResponseDto>>(records);
     }
     public async Task<List<RecordResponseDto>> GetPendingRecordsAsync(
     ClaimsPrincipal user)
     {
         await EnsureAdminAsync(user);
 
-        var records =
-            await _recordRepository.GetPendingAsync();
+        var records = await _unitOfWork.Records.GetPendingAsync();
 
-        return _recordMapperHelper
-            .MapToResponseDtos(records);
+        return _mapper.Map<List<RecordResponseDto>>(records);
     }
-    public async Task ApproveRecordAsync(
-    int id,
-    ClaimsPrincipal user)
+    public async Task ApproveRecordAsync(int id, ClaimsPrincipal user)
     {
         await EnsureAdminAsync(user);
 
-        var record =
-            await _recordRepository.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
 
         if (record == null)
         {
@@ -98,25 +108,20 @@ public class RecordService : IRecordService
         record.Status = Enums.RecordStatus.Approved;
         record.ReviewedAt = DateTime.UtcNow;
 
-        var adminId =
-            user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var adminId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (int.TryParse(adminId, out var parsedAdminId))
         {
             record.ReviewedBy = parsedAdminId;
         }
 
-        await _recordRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
     }
-    public async Task RejectRecordAsync(
-    int id,
-    string? reason,
-    ClaimsPrincipal user)
+    public async Task RejectRecordAsync(int id, string? reason, ClaimsPrincipal user)
     {
         await EnsureAdminAsync(user);
 
-        var record =
-            await _recordRepository.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
 
         if (record == null)
         {
@@ -127,41 +132,36 @@ public class RecordService : IRecordService
 
         record.Status = Enums.RecordStatus.Rejected;
 
-        record.RejectReason =
-            string.IsNullOrWhiteSpace(reason)
-                ? null
-                : reason.Trim();
+        record.RejectReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
 
         record.ReviewedAt = DateTime.UtcNow;
 
-        var adminId =
-            user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var adminId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (int.TryParse(adminId, out var parsedAdminId))
         {
             record.ReviewedBy = parsedAdminId;
         }
 
-        await _recordRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<RecordResponseDto> CreateRecordAsync(
-    CreateRecordDto dto)
+    public async Task<RecordResponseDto> CreateRecordAsync(CreateRecordDto dto, ClaimsPrincipal user)
     {
-        var record = new Record();
+        var userId = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var record = _mapper.Map<Record>(dto);
 
-        _recordHelper.ApplyRecordData(record, dto);
-
+        record.UserId = userId;
         record.Views = 0;
         record.CreatedAt = DateTime.UtcNow;
         record.UpdatedAt = DateTime.UtcNow;
 
-        await _recordRepository.AddAsync(record);
-
-        await _recordRepository.SaveChangesAsync();
+        await _unitOfWork.Records.AddAsync(record);
+        await _unitOfWork.SaveChangesAsync();
 
         var savedRecord =
-            await _recordRepository.GetByIdAsync(record.Id);
+            await _unitOfWork.Records.GetByIdAsync(record.Id);
+
 
         if (savedRecord == null)
         {
@@ -171,15 +171,11 @@ public class RecordService : IRecordService
                 "RECORD_LOAD_FAILED");
         }
 
-        return _recordMapperHelper
-            .MapToResponseDto(savedRecord);
+        return _mapper.Map<RecordResponseDto>(savedRecord);
     }
-    public async Task<RecordResponseDto> UpdateRecordAsync(
-    int id,
-    CreateRecordDto dto)
+    public async Task<RecordResponseDto> UpdateRecordAsync(int id, CreateRecordDto dto)
     {
-        var record =
-            await _recordRepository.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
 
         if (record == null)
         {
@@ -188,14 +184,13 @@ public class RecordService : IRecordService
                 "RECORD_NOT_FOUND");
         }
 
-        _recordHelper.ApplyRecordData(record, dto);
+        _mapper.Map(dto, record);
 
         record.UpdatedAt = DateTime.UtcNow;
 
-        await _recordRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
-        var updatedRecord =
-            await _recordRepository.GetByIdAsync(id);
+        var updatedRecord = await _unitOfWork.Records.GetByIdAsync(id);
 
         if (updatedRecord == null)
         {
@@ -205,11 +200,9 @@ public class RecordService : IRecordService
                 "RECORD_LOAD_FAILED");
         }
 
-        return _recordMapperHelper
-            .MapToResponseDto(updatedRecord);
+        return _mapper.Map<RecordResponseDto>(updatedRecord);
     }
-    private async Task EnsureAdminAsync(
-    ClaimsPrincipal user)
+    private async Task EnsureAdminAsync(ClaimsPrincipal user)
     {
         if (user.Identity?.IsAuthenticated != true)
         {
@@ -218,8 +211,7 @@ public class RecordService : IRecordService
                 "AUTHENTICATION_REQUIRED");
         }
 
-        var isAdmin =
-            await _adminAccessHelper.IsCurrentUserAdminAsync(user);
+        var isAdmin = await _adminAccessHelper.IsCurrentUserAdminAsync(user);
 
         if (!isAdmin)
         {
@@ -231,7 +223,7 @@ public class RecordService : IRecordService
     public async Task DeleteRecordAsync(int id)
     {
         var record =
-            await _recordRepository.GetEntityByIdAsync(id);
+            await _unitOfWork.Records.GetEntityByIdAsync(id);
 
         if (record == null)
         {
@@ -240,9 +232,9 @@ public class RecordService : IRecordService
                 "RECORD_NOT_FOUND");
         }
 
-        _recordRepository.Delete(record);
+        _unitOfWork.Records.Delete(record);
 
-        await _recordRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
     }
     public async Task<RecordVideoDirectUploadResponseDto> UploadVideoAsync(
     VideoUploadFormDto form)
@@ -254,9 +246,7 @@ public class RecordService : IRecordService
                 "VIDEO_FILE_REQUIRED");
         }
 
-        var result =
-            await _s3PresignedUrlService.UploadVideoAsync(
-                form.VideoFile);
+        var result = await _s3PresignedUrlService.UploadVideoAsync(form.VideoFile);
 
         return new RecordVideoDirectUploadResponseDto
         {
@@ -265,8 +255,7 @@ public class RecordService : IRecordService
             UploadedAtUtc = result.UploadedAtUtc
         };
     }
-    public RecordVideoUploadResponseDto CreateVideoUploadUrl(
-    CreateRecordVideoUploadDto dto)
+    public RecordVideoUploadResponseDto CreateVideoUploadUrl( CreateRecordVideoUploadDto dto)
     {
         if (string.IsNullOrWhiteSpace(dto.FileName))
         {
@@ -297,8 +286,7 @@ public class RecordService : IRecordService
     public async Task<List<RecordRecommendationDto>>
     GetRecommendationVehiclesAsync(int mapId)
     {
-        var records =
-            await _recordRepository.GetApprovedByMapIdAsync(mapId);
+        var records = await _unitOfWork.Records.GetApprovedByMapIdAsync(mapId);
 
         var vehicles = records
             .GroupBy(r => r.VehicleId)
@@ -322,7 +310,7 @@ public class RecordService : IRecordService
             .Select(v => v.VehicleId)
             .ToList();
 
-        var vehicleEntities = await _vehicleRepository.GetByIdsAsync(vehicleIds);
+        var vehicleEntities = await _unitOfWork.Vehicles.GetByIdsAsync(vehicleIds);
 
         return vehicles
             .Select(v =>

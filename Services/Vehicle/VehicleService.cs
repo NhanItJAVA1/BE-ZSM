@@ -1,5 +1,7 @@
-﻿using BE_ZSM.DTOs.Vehicles;
+﻿using AutoMapper;
+using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Exceptions;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Repositories.Vehicle;
 
 namespace BE_ZSM.Services.Vehicle
@@ -8,44 +10,35 @@ namespace BE_ZSM.Services.Vehicle
     {
         private readonly IVehicleRepository _vehicleRepository;
         private readonly S3PresignedUrlService _presignedUrlService;
+        private readonly IMapper _mapper;
+        private readonly IUnitOfWork _unitOfWork;
 
         public VehicleService(
         IVehicleRepository vehicleRepository,
-        S3PresignedUrlService presignedUrlService)
+        S3PresignedUrlService presignedUrlService,
+        IMapper mapper,
+        IUnitOfWork unitOfWork)
         {
             _vehicleRepository = vehicleRepository;
             _presignedUrlService = presignedUrlService;
+            _mapper = mapper;
+            _unitOfWork = unitOfWork;
         }
 
         public async Task<VehicleResponseDto> CreateVehicleAsync(CreateVehicleDto dto)
         {
-            var vehicle = new Entities.Vehicle
-            {
-                Name = dto.Name,
-                Rank = dto.Rank,
-                Type = dto.Type,
-                ImageUrl = dto.ImageUrl,
-                CreatedAt = DateTime.UtcNow
-            };
+            var vehicle = _mapper.Map<Entities.Vehicle>(dto);
+            vehicle.CreatedAt = DateTime.UtcNow;
 
             await _vehicleRepository.AddAsync(vehicle);
-            await _vehicleRepository.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
-            return new VehicleResponseDto
-            {
-                Id = vehicle.Id,
-                Name = vehicle.Name,
-                Type = vehicle.Type,
-                Rank = vehicle.Rank,
-                ImageUrl = vehicle.ImageUrl,
-                CreatedAt = vehicle.CreatedAt
-            };
+            return _mapper.Map<VehicleResponseDto>(vehicle);
         }
 
         public async Task DeleteVehicleAsync(int id)
         {
-            var vehicle =
-           await _vehicleRepository.GetEntityByIdAsync(id);
+            var vehicle = await _vehicleRepository.GetByIdAsync(id);
 
             if (vehicle == null)
             {
@@ -56,7 +49,7 @@ namespace BE_ZSM.Services.Vehicle
 
             _vehicleRepository.Delete(vehicle);
 
-            await _vehicleRepository.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
         }
 
         public async Task<VehicleResponseDto> GetVehicleAsync(int id)
@@ -69,31 +62,28 @@ namespace BE_ZSM.Services.Vehicle
                     "Vehicle not found",
                     "VEHICLE_NOT_FOUND");
             }
+            var response = _mapper.Map<VehicleResponseDto>(vehicle);
 
-            vehicle.ImageUrl =
+            response.ImageUrl =
                 _presignedUrlService.CreateGetUrlFromStoredUrl(
-                    vehicle.ImageUrl);
+                    response.ImageUrl);
 
-            return vehicle;
+            return response;
         }
 
         public async Task<List<VehicleResponseDto>> GetVehiclesAsync()
         {
             var vehicles = await _vehicleRepository.GetAllAsync();
+            var responses = _mapper.Map<List<VehicleResponseDto>>(vehicles);
 
-            foreach (var vehicle in vehicles)
-            {
-                vehicle.ImageUrl =
-                    _presignedUrlService.CreateGetUrlFromStoredUrl(
-                        vehicle.ImageUrl);
-            }
+            responses.ForEach(x => x.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(x.ImageUrl));
 
-            return vehicles;
+            return responses;
         }
 
         public async Task<VehicleResponseDto> UpdateVehicleAsync(int id, UpdateVehicleDto dto)
         {
-            var vehicle = await _vehicleRepository.GetEntityByIdAsync(id);
+            var vehicle = await _vehicleRepository.GetByIdAsync(id);
 
             if (vehicle == null)
             {
@@ -102,22 +92,10 @@ namespace BE_ZSM.Services.Vehicle
                     "VEHICLE_NOT_FOUND");
             }
 
-            vehicle.Name = dto.Name;
-            vehicle.Rank = dto.Rank;
-            vehicle.Type = dto.Type;
-            vehicle.ImageUrl = dto.ImageUrl;
+            _mapper.Map(dto, vehicle);
+            await _unitOfWork.SaveChangesAsync();
 
-            await _vehicleRepository.SaveChangesAsync();
-
-            return new VehicleResponseDto
-            {
-                Id = vehicle.Id,
-                Name = vehicle.Name,
-                Type = vehicle.Type,
-                Rank = vehicle.Rank,
-                ImageUrl = vehicle.ImageUrl,
-                CreatedAt = vehicle.CreatedAt
-            };
+            return _mapper.Map<VehicleResponseDto>(vehicle);
         }
     }
 }

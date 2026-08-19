@@ -10,7 +10,10 @@ services:
     restart: unless-stopped
 
   be-zsm:
-    image: huynhtrongnhan98/zsm-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zsm-backend-local
     container_name: zsm-backend
     ports:
       - "8080:8080"

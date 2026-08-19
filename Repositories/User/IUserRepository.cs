@@ -1,24 +1,16 @@
 ﻿using BE_ZSM.Entities;
+using BE_ZSM.Services;
 
 namespace BE_ZSM.Repositories.Interfaces;
 
-public interface IUserRepository
+public interface IUserRepository : IGenericRepository<User>
 {
-    Task<List<User>> GetAllAsync();
-
-    Task<User?> GetByIdAsync(int id);
-
     Task<User?> GetByUsernameAsync(string username);
-
+    Task<User?> GetByIdWithRoleAsync(int id);
+    Task<List<User>> GetAllWithRoleAsync();
     Task<bool> ExistsByUsernameAsync(string username);
 
     Task<bool> ExistsByEmailAsync(
         string email,
         int? excludeUserId = null);
-
-    Task AddAsync(User user);
-
-    void Delete(User user);
-
-    Task SaveChangesAsync();
 }

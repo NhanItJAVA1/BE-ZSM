@@ -44,7 +44,7 @@ namespace BE_ZSM.Helpers
                 {
                     Id = record.Map.Id,
                     Name = record.Map.Name,
-                    Rate = record.Map.Rate.ToString(),
+                    Rate = record.Map.Rate,
                     ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(record.Map.ImageUrl)
                 } : null,
                 Vehicle = record.Vehicle != null ? new VehicleMinimalDto

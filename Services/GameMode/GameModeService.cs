@@ -1,35 +1,36 @@
-﻿using BE_ZSM.DTOs.GameModes;
+﻿using AutoMapper;
+using BE_ZSM.DTOs.GameModes;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
 
 namespace BE_ZSM.Services;
 
 public class GameModeService : IGameModeService
 {
-    private readonly IGameModeRepository _gameModeRepository;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IMapper _mapper;
 
     public GameModeService(
-        IGameModeRepository gameModeRepository)
+        IUnitOfWork unitOfWork,
+        IMapper mapper)
     {
-        _gameModeRepository = gameModeRepository;
+        _unitOfWork = unitOfWork;
+        _mapper = mapper;
     }
 
     public async Task<List<GameModeResponseDto>> GetGameModesAsync()
     {
-        var gameModes =
-            await _gameModeRepository.GetAllAsync();
+        var gameModes = await _unitOfWork.GameModes.GetAllAsync();
 
-        return gameModes
-            .Select(MapToResponse)
-            .ToList();
+        return _mapper.Map<List<GameModeResponseDto>>(gameModes);
     }
 
     public async Task<GameModeResponseDto> GetGameModeAsync(int id)
     {
-        var gameMode =
-            await _gameModeRepository.GetByIdAsync(id);
+        var gameMode = await _unitOfWork.GameModes.GetByIdAsync(id);
 
         if (gameMode == null)
         {
@@ -38,11 +39,10 @@ public class GameModeService : IGameModeService
                 "GAME_MODE_NOT_FOUND");
         }
 
-        return MapToResponse(gameMode);
+        return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
-    public async Task<GameModeResponseDto> CreateGameModeAsync(
-        CreateGameModeDto dto)
+    public async Task<GameModeResponseDto> CreateGameModeAsync(CreateGameModeDto dto)
     {
         var gameMode = new GameMode
         {
@@ -50,19 +50,16 @@ public class GameModeService : IGameModeService
             Description = dto.Description
         };
 
-        await _gameModeRepository.AddAsync(gameMode);
+        await _unitOfWork.GameModes.AddAsync(gameMode);
 
-        await _gameModeRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
-        return MapToResponse(gameMode);
+        return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
-    public async Task<GameModeResponseDto> UpdateGameModeAsync(
-        int id,
-        UpdateGameModeDto dto)
+    public async Task<GameModeResponseDto> UpdateGameModeAsync(int id, UpdateGameModeDto dto)
     {
-        var gameMode =
-            await _gameModeRepository.GetByIdAsync(id);
+        var gameMode = await _unitOfWork.GameModes.GetByIdAsync(id);
 
         if (gameMode == null)
         {
@@ -71,18 +68,15 @@ public class GameModeService : IGameModeService
                 "GAME_MODE_NOT_FOUND");
         }
 
-        gameMode.Name = dto.Name;
-        gameMode.Description = dto.Description;
-
-        await _gameModeRepository.SaveChangesAsync();
-
-        return MapToResponse(gameMode);
+        _mapper.Map(dto, gameMode);
+        await _unitOfWork.SaveChangesAsync();
+        return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
     public async Task DeleteGameModeAsync(int id)
     {
         var gameMode =
-            await _gameModeRepository.GetByIdAsync(id);
+            await _unitOfWork.GameModes.GetByIdAsync(id);
 
         if (gameMode == null)
         {
@@ -91,19 +85,8 @@ public class GameModeService : IGameModeService
                 "GAME_MODE_NOT_FOUND");
         }
 
-        _gameModeRepository.Delete(gameMode);
+        _unitOfWork.GameModes.Delete(gameMode);
 
-        await _gameModeRepository.SaveChangesAsync();
-    }
-
-    private static GameModeResponseDto MapToResponse(
-        GameMode gameMode)
-    {
-        return new GameModeResponseDto
-        {
-            Id = gameMode.Id,
-            Name = gameMode.Name,
-            Description = gameMode.Description
-        };
-    }
+        await _unitOfWork.SaveChangesAsync();
+    }   
 }

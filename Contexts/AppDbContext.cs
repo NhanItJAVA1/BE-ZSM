@@ -16,43 +16,26 @@ namespace BE_ZSM.Contexts
 
         protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
+
             modelBuilder.Entity<User>(entity =>
             {
                 entity.HasIndex(u => u.Username).IsUnique();
                 entity.HasIndex(u => u.Email).IsUnique();
-
                 entity.HasOne(u => u.Role)
                     .WithMany(r => r.Users)
                     .HasForeignKey(u => u.RoleId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
-            //modelBuilder.Entity<User>()
-            //    .HasIndex(u => u.Username)
-            //    .IsUnique();
 
-            //modelBuilder.Entity<User>()
-            //    .HasIndex(u => u.Email)
-            //    .IsUnique();
-            //modelBuilder.Entity<User>()
-            //    .HasOne(u => u.Role)
-            //    .WithMany(r => r.Users)
-            //    .HasForeignKey(u => u.RoleId)
-            //    .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<Role>()
-                .Property(r => r.Name)
-                .HasConversion<int>();
-
-
-
-            modelBuilder.Entity<Role>()
-                .Property(r => r.Id)
-                .ValueGeneratedNever();
-
-            modelBuilder.Entity<Role>().HasData(
-                new Role { Id = 2, Name = Enums.UserRole.Admin, Description = "Administrator" },
-                new Role { Id = 1, Name = Enums.UserRole.User, Description = "Regular User" }
+            modelBuilder.Entity<Role>(entity =>
+            {
+                entity.Property(r => r.Name).HasConversion<int>();
+                entity.Property(r => r.Id).ValueGeneratedNever();
+                entity.HasData(
+                    new Role { Id = 2, Name = Enums.UserRole.Admin, Description = "Administrator" },
+                    new Role { Id = 1, Name = Enums.UserRole.User, Description = "Regular User" }
                 );
+            });         
         }
     }
 }

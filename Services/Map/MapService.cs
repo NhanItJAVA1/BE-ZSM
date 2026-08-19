@@ -1,37 +1,45 @@
-﻿using BE_ZSM.DTOs.Maps;
+﻿using AutoMapper;
+using BE_ZSM.DTOs.Maps;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories;
-using BE_ZSM.Repositories.Interfaces;
+using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
 
 namespace BE_ZSM.Services;
 
 public class MapService : IMapService
 {
-    private readonly IMapRepository _mapRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly S3PresignedUrlService _presignedUrlService;
+    private readonly IMapper _mapper;
 
     public MapService(
-        IMapRepository mapRepository,
-        S3PresignedUrlService presignedUrlService)
+        IUnitOfWork unitOfWork,
+        S3PresignedUrlService presignedUrlService,
+        IMapper mapper)
     {
-        _mapRepository = mapRepository;
+        _unitOfWork = unitOfWork;
         _presignedUrlService = presignedUrlService;
+        _mapper = mapper;
     }
 
     public async Task<List<MapResponseDto>> GetMapsAsync()
     {
-        var maps = await _mapRepository.GetAllAsync();
+        var maps = await _unitOfWork.Maps.GetAllAsync();
 
-        return maps
-            .Select(MapToResponse)
-            .ToList();
+        var responses = _mapper.Map<List<MapResponseDto>>(maps);
+
+        foreach (var response in responses)
+        {
+            response.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(response.ImageUrl);
+        }
+
+        return responses;
     }
 
     public async Task<MapResponseDto> GetMapAsync(int id)
     {
-        var map = await _mapRepository.GetByIdAsync(id);
+        var map = await _unitOfWork.Maps.GetByIdAsync(id);
 
         if (map == null)
         {
@@ -40,32 +48,25 @@ public class MapService : IMapService
                 "MAP_NOT_FOUND");
         }
 
-        return MapToResponse(map);
+        return _mapper.Map<MapResponseDto>(map);
     }
 
     public async Task<MapResponseDto> CreateMapAsync(
         CreateMapDto dto)
     {
-        var map = new Map
-        {
-            Name = dto.Name,
-            Rate = dto.Rate,
-            ImageUrl = dto.ImageUrl,
-            CreatedAt = DateTime.UtcNow
-        };
+        var map = _mapper.Map<Map>(dto);
+        map.CreatedAt = DateTime.UtcNow;
 
-        await _mapRepository.AddAsync(map);
+        await _unitOfWork.Maps.AddAsync(map);
 
-        await _mapRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
-        return MapToResponse(map);
+        return _mapper.Map<MapResponseDto>(map);
     }
 
-    public async Task<MapResponseDto> UpdateMapAsync(
-        int id,
-        UpdateMapDto dto)
+    public async Task<MapResponseDto> UpdateMapAsync(int id, UpdateMapDto dto)
     {
-        var map = await _mapRepository.GetByIdAsync(id);
+        var map = await _unitOfWork.Maps.GetByIdAsync(id);
 
         if (map == null)
         {
@@ -74,18 +75,17 @@ public class MapService : IMapService
                 "MAP_NOT_FOUND");
         }
 
-        map.Name = dto.Name;
-        map.Rate = dto.Rate;
-        map.ImageUrl = dto.ImageUrl;
+        _mapper.Map(dto, map);
+        map.CreatedAt = DateTime.UtcNow;
 
-        await _mapRepository.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
-        return MapToResponse(map);
+        return _mapper.Map<MapResponseDto>(map);
     }
 
     public async Task DeleteMapAsync(int id)
     {
-        var map = await _mapRepository.GetByIdAsync(id);
+        var map = await _unitOfWork.Maps.GetByIdAsync(id);
 
         if (map == null)
         {
@@ -94,21 +94,8 @@ public class MapService : IMapService
                 "MAP_NOT_FOUND");
         }
 
-        _mapRepository.Delete(map);
+        _unitOfWork.Maps.Delete(map);
 
-        await _mapRepository.SaveChangesAsync();
-    }
-
-    private MapResponseDto MapToResponse(Map map)
-    {
-        return new MapResponseDto
-        {
-            Id = map.Id,
-            Name = map.Name,
-            Rate = map.Rate,
-            ImageUrl = _presignedUrlService
-                .CreateGetUrlFromStoredUrl(map.ImageUrl),
-            CreatedAt = map.CreatedAt
-        };
+        await _unitOfWork.SaveChangesAsync();
     }
 }

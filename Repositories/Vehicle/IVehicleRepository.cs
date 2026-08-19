@@ -1,22 +1,12 @@
-﻿using BE_ZSM.DTOs.Vehicles;
+﻿using BE_ZSM.Services;
 using VehicleEntity = BE_ZSM.Entities.Vehicle;
 
 namespace BE_ZSM.Repositories.Vehicle
 {
     public interface IVehicleRepository
+        : IGenericRepository<VehicleEntity>
     {
-        Task<List<VehicleResponseDto>> GetAllAsync();
-
-        Task<VehicleResponseDto?> GetByIdAsync(int id);
-
-        Task<VehicleEntity?> GetEntityByIdAsync(int id);
-
-        Task<List<VehicleEntity>> GetByIdsAsync(List<int> vehicleIds);
-
-        Task AddAsync(VehicleEntity vehicle);
-
-        void Delete(VehicleEntity vehicle);
-
-        Task SaveChangesAsync();
+        Task<List<VehicleEntity>> GetByIdsAsync(
+            List<int> vehicleIds);
     }
 }

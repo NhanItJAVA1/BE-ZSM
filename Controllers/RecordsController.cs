@@ -94,7 +94,7 @@ public class RecordsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateRecord([FromBody] CreateRecordDto dto)
     {
-        var record = await _recordService.CreateRecordAsync(dto);
+        var record = await _recordService.CreateRecordAsync(dto, User);
         return CreatedAtAction(nameof(GetRecord), new { id = record.Id },  record);
     }
 

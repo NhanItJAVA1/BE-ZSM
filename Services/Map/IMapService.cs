@@ -1,4 +1,5 @@
 ﻿using BE_ZSM.DTOs.Maps;
+using BE_ZSM.Entities;
 
 namespace BE_ZSM.Services.Interfaces;
 

@@ -21,7 +21,7 @@ public interface IRecordService
 
     RecordVideoUploadResponseDto CreateVideoUploadUrl(CreateRecordVideoUploadDto dto);
 
-    Task<RecordResponseDto> CreateRecordAsync(CreateRecordDto dto);
+    Task<RecordResponseDto> CreateRecordAsync(CreateRecordDto dto, ClaimsPrincipal user);
 
     Task<RecordResponseDto> UpdateRecordAsync(int id,CreateRecordDto dto);
 
