@@ -9,11 +9,13 @@ services:
       - sqlserver_data:/var/opt/mssql
     restart: unless-stopped
 
+  redis:
+    image: redis:alpine
+    container_name: zsm-redis
+    restart: unless-stopped
+
   be-zsm:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: zsm-backend-local
+    image: huynhtrongnhan98/zsm-backend:latest
     container_name: zsm-backend
     ports:
       - "8080:8080"
@@ -22,6 +24,7 @@ services:
       ASPNETCORE_URLS: http://+:8080
 
       ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=ZSM;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;"
+      ConnectionStrings__Redis: "redis:6379"
 
       AWS_BUCKET_NAME: ${AWS_BUCKET_NAME}
       AWS_REGION: ${AWS_REGION}
@@ -35,6 +38,7 @@ services:
 
     depends_on:
       - sqlserver
+      - redis
     restart: unless-stopped
 
 volumes:
