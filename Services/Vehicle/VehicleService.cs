@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
+using BE_ZSM.DTOs.Maps;
 using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Repositories.Vehicle;
+using BE_ZSM.Services.Cache;
 
 namespace BE_ZSM.Services.Vehicle
 {
@@ -12,13 +14,17 @@ namespace BE_ZSM.Services.Vehicle
         private readonly S3PresignedUrlService _presignedUrlService;
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
+        private const string CacheKey = "maps:all";
+        private readonly ICacheService _cache;
 
         public VehicleService(
+            ICacheService cache,
         IVehicleRepository vehicleRepository,
         S3PresignedUrlService presignedUrlService,
         IMapper mapper,
         IUnitOfWork unitOfWork)
         {
+            _cache = cache;
             _vehicleRepository = vehicleRepository;
             _presignedUrlService = presignedUrlService;
             _mapper = mapper;
@@ -73,10 +79,18 @@ namespace BE_ZSM.Services.Vehicle
 
         public async Task<List<VehicleResponseDto>> GetVehiclesAsync()
         {
+            var cached = await _cache.GetAsync<List<VehicleResponseDto>>(CacheKey);
+
+            if (cached != null)
+            {
+                return cached;
+            }
             var vehicles = await _vehicleRepository.GetAllAsync();
             var responses = _mapper.Map<List<VehicleResponseDto>>(vehicles);
 
             responses.ForEach(x => x.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(x.ImageUrl));
+
+            await _cache.SetAsync(CacheKey, responses, TimeSpan.FromMinutes(30));
 
             return responses;
         }
