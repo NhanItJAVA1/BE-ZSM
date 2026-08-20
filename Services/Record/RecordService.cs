@@ -40,26 +40,28 @@ public class RecordService : IRecordService
             .ToListAsync();
 
         var responses = _mapper.Map<List<RecordResponseDto>>(records);
+
         foreach (var response in responses)
         {
             response.VideoUrl =
-                _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                await _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
                     response.VideoUrl);
 
             response.ThumbnailUrl =
-                _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                await _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
                     response.ThumbnailUrl);
+
             if (response.Map != null)
             {
                 response.Map.ImageUrl =
-                    _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                    await _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
                         response.Map.ImageUrl);
             }
 
             if (response.Vehicle != null)
             {
                 response.Vehicle.ImageUrl =
-                    _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
+                    await _s3PresignedUrlService.CreateGetUrlFromStoredUrl(
                         response.Vehicle.ImageUrl);
             }
         }

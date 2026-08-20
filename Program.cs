@@ -15,7 +15,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Prometheus;
-using Prometheus;
 using System.Security.Claims;
 using System.Text;
 public partial class Program
@@ -97,7 +96,6 @@ public partial class Program
 
         builder.Services.AddScoped<JwtService>();
         builder.Services.AddScoped<DbSaveHelper>();
-        builder.Services.AddScoped<RecordMapperHelper>();
         builder.Services.AddScoped<AdminAccessHelper>();
         builder.Services.AddScoped<S3PresignedUrlService>();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

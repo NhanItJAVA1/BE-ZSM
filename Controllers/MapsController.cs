@@ -35,7 +35,7 @@ public class MapsController : ControllerBase
     {
         await _mapService.CreateMapAsync(dto);
 
-        return Ok(new {message = "Map created successfully"});
+        return Ok(new {message = "Successfully" });
     }
 
     [Authorize(Roles = "Admin")]
