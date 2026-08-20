@@ -7,6 +7,7 @@ using BE_ZSM.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using BE_ZSM.Extensions;
+using BE_ZSM.Repositories.Generic;
 namespace BE_ZSM.Services;
 
 public class RecordService : IRecordService
@@ -15,6 +16,7 @@ public class RecordService : IRecordService
     private readonly AdminAccessHelper _adminAccessHelper;
     private readonly IMapper _mapper;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IGenericRepository<Record> _recordRepo;
 
     public RecordService(
         S3PresignedUrlService s3PresignedUrlService,
@@ -26,12 +28,12 @@ public class RecordService : IRecordService
         _adminAccessHelper = adminAccessHelper;
         _mapper = mapper;
         _unitOfWork = unitOfWork;
+        _recordRepo = _unitOfWork.GetRepository<Record>();
     }
 
     public async Task<List<RecordResponseDto>> GetRecordsAsync()
     {
-        var repository = _unitOfWork.GetRepository<Record>();
-        var records = await repository
+        var records = await _recordRepo
             .Where(r => r.Status == Enums.RecordStatus.Approved)
             .IncludeDetails()
             .AsNoTracking()
@@ -67,7 +69,7 @@ public class RecordService : IRecordService
 
     public async Task<RecordResponseDto> GetRecordAsync(int id)
     {
-        var record = await _unitOfWork.GetRepository<Record>()
+        var record = await _recordRepo
             .Where(r => r.Id == id)
             .IncludeDetails()
             .AsNoTracking()
@@ -85,7 +87,7 @@ public class RecordService : IRecordService
 
     public async Task<List<RecordResponseDto>> GetRecordsByUserAsync(int userId)
     {
-        var records = await _unitOfWork.GetRepository<Record>()
+        var records = await _recordRepo
             .Where(r => r.UserId == userId)
             .IncludeDetails()
             .AsNoTracking()
@@ -98,7 +100,7 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var records = await _unitOfWork.GetRepository<Record>()
+        var records = await _recordRepo
             .Where(r => r.Status == Enums.RecordStatus.Pending)
             .IncludeDetails()
             .OrderByDescending(r => r.CreatedAt)
@@ -111,7 +113,7 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var record = await _unitOfWork.GetRepository<Record>()
+        var record = await _recordRepo
             .Where(r => r.Id == id)
             .IncludeDetails()
             .AsNoTracking()
@@ -140,7 +142,7 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var record = await _unitOfWork.GetRepository<Record>()
+        var record = await _recordRepo
             .Where(r => r.Id == id)
             .IncludeDetails()
             .AsNoTracking()
@@ -169,7 +171,7 @@ public class RecordService : IRecordService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    public async Task<RecordResponseDto> CreateRecordAsync(CreateRecordDto dto, ClaimsPrincipal user)
+    public async Task CreateRecordAsync(CreateRecordDto dto, ClaimsPrincipal user)
     {
         var userId = int.Parse(user.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var record = _mapper.Map<Record>(dto);
@@ -177,13 +179,12 @@ public class RecordService : IRecordService
         record.UserId = userId;
         record.Views = 0;
         record.CreatedAt = DateTime.UtcNow;
-        record.UpdatedAt = DateTime.UtcNow;
 
-        await _unitOfWork.GetRepository<Record>().CreateAsync(record);
+        await _recordRepo.CreateAsync(record);
         await _unitOfWork.SaveChangesAsync();
 
         var savedRecord =
-            await _unitOfWork.GetRepository<Record>()
+            await _recordRepo
                 .Where(r => r.Id == record.Id)
                 .IncludeDetails()
                 .AsNoTracking()
@@ -198,11 +199,10 @@ public class RecordService : IRecordService
                 "RECORD_LOAD_FAILED");
         }
 
-        return _mapper.Map<RecordResponseDto>(savedRecord);
     }
-    public async Task<RecordResponseDto> UpdateRecordAsync(int id, CreateRecordDto dto)
+    public async Task UpdateRecordAsync(int id, CreateRecordDto dto)
     {
-        var record = await _unitOfWork.GetRepository<Record>().FindAsync(r => r.Id == id);
+        var record = await _recordRepo.FindAsync(r => r.Id == id);
 
         if (record == null)
         {
@@ -217,7 +217,7 @@ public class RecordService : IRecordService
 
         await _unitOfWork.SaveChangesAsync();
 
-        var updatedRecord = await _unitOfWork.GetRepository<Record>()
+        var updatedRecord = await _recordRepo
             .Where(r => r.Id == id)
             .IncludeDetails()
             .AsNoTracking()
@@ -231,7 +231,6 @@ public class RecordService : IRecordService
                 "RECORD_LOAD_FAILED");
         }
 
-        return _mapper.Map<RecordResponseDto>(updatedRecord);
     }
     private async Task EnsureAdminAsync(ClaimsPrincipal user)
     {
@@ -253,7 +252,7 @@ public class RecordService : IRecordService
     }
     public async Task DeleteRecordAsync(int id)
     {
-        var repository = _unitOfWork.GetRepository<Record>();
+        var repository = _recordRepo;
         var record = await repository.FindAsync(r => r.Id == id);
 
 
@@ -318,7 +317,7 @@ public class RecordService : IRecordService
     public async Task<List<RecordRecommendationDto>>
     GetRecommendationVehiclesAsync(int mapId)
     {
-        var records = await _unitOfWork.GetRepository<Record>()
+        var records = await _recordRepo
             .Where(r =>
                 r.MapId == mapId &&
                 r.Status == Enums.RecordStatus.Approved)

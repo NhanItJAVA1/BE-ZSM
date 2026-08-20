@@ -17,39 +17,27 @@ public class UsersController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> GetUsers()
-    {
-        var users = await _userService.GetUsersAsync();
-
-        return Ok(users);
+    { 
+        return Ok(await _userService.GetUsersAsync());
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetUser(int id)
     {
-        var user = await _userService.GetUserAsync(id);
-
-        return Ok(user);
+        return Ok(await _userService.GetUserAsync(id));
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register(
-        RegisterUserDto dto)
+    public async Task<IActionResult> Register(RegisterUserDto dto)
     {
-        var user = await _userService.RegisterAsync(dto);
-
-        return CreatedAtAction(
-            nameof(GetUser),
-            new { id = user.Id },
-            user);
+        await _userService.RegisterAsync(dto);
+        return Ok();
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login(
-        LoginUserDto dto)
+    public async Task<IActionResult> Login(LoginUserDto dto)
     {
-        var result = await _userService.LoginAsync(dto);
-
-        return Ok(result);
+        return Ok(await _userService.LoginAsync(dto));
     }
 
     [HttpPut("{id}")]
@@ -57,27 +45,20 @@ public class UsersController : ControllerBase
         int id,
         UpdateUserDto dto)
     {
-        var user = await _userService.UpdateAsync(id, dto);
-
-        return Ok(user);
+        await _userService.UpdateAsync(id, dto);
+        return Ok();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
         await _userService.DeleteAsync(id);
-
         return NoContent();
     }
 
     [HttpPost("refresh-token")]
-    public async Task<IActionResult> RefreshToken(
-        RefreshTokenDto dto)
+    public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
     {
-        var result =
-            await _userService.RefreshTokenAsync(
-                dto.RefreshToken);
-
-        return Ok(result);
+        return Ok(await _userService.RefreshTokenAsync(dto.RefreshToken));
     }
 }

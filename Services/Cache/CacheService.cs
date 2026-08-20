@@ -1,45 +1,44 @@
-﻿using Amazon.Runtime.Internal.Util;
-using Amazon.S3.Model;
-using DotNetEnv;
+﻿using BE_ZSM.Services.Cache;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 
-namespace BE_ZSM.Services.Cache
+public class CacheService : ICacheService
 {
-    public class CacheService : ICacheService
+    private readonly IDistributedCache _cache;
+
+    public CacheService(IDistributedCache cache)
     {
-        private readonly IDistributedCache _distributedCache;
-        public CacheService(IDistributedCache distributedCache)
-        {
-            _distributedCache = distributedCache;
-        }
+        _cache = cache;
+    }
 
-        public async Task<T?> GetAsync<T>(string key)
-        {
-            var json = await _distributedCache.GetStringAsync(key);
+    public async Task<T?> GetAsync<T>(string key)
+    {
+        var json = await _cache.GetStringAsync(key);
 
-            if (json == null)
-                return default;
+        if (json == null)
+            return default;
 
-            return JsonSerializer.Deserialize<T>(json);
-        }
+        return JsonSerializer.Deserialize<T>(json);
+    }
 
-        public async Task SetAsync<T>(string key, T value, TimeSpan expiration)
-        {
-            var json = JsonSerializer.Serialize(value);
+    public async Task SetAsync<T>(
+        string key,
+        T value,
+        TimeSpan expiration)
+    {
+        var json = JsonSerializer.Serialize(value);
 
-            await _distributedCache.SetStringAsync(
-                key,
-                json,
-                new DistributedCacheEntryOptions
-                {
-                    AbsoluteExpirationRelativeToNow = expiration
-                });
-        }
+        await _cache.SetStringAsync(
+            key,
+            json,
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = expiration
+            });
+    }
 
-        public async Task RemoveAsync(string key)
-        {
-            await _distributedCache.RemoveAsync(key);
-        }
+    public async Task RemoveAsync(string key)
+    {
+        await _cache.RemoveAsync(key);
     }
 }

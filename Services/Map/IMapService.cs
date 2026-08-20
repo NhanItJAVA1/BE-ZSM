@@ -9,9 +9,9 @@ public interface IMapService
 
     Task<MapResponseDto> GetMapAsync(int id);
 
-    Task<MapResponseDto> CreateMapAsync(CreateMapDto dto);
+    Task CreateMapAsync(CreateMapDto dto);
 
-    Task<MapResponseDto> UpdateMapAsync(
+    Task UpdateMapAsync(
         int id,
         UpdateMapDto dto);
 

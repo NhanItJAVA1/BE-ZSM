@@ -19,17 +19,13 @@ public class MapsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetMaps()
     {
-        var maps = await _mapService.GetMapsAsync();
-
-        return Ok(maps);
+        return Ok(await _mapService.GetMapsAsync());
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetMap(int id)
     {
-        var map = await _mapService.GetMapAsync(id);
-
-        return Ok(map);
+        return Ok(await _mapService.GetMapAsync(id));
     }
 
     [Authorize(Roles = "Admin")]
@@ -37,12 +33,9 @@ public class MapsController : ControllerBase
     public async Task<IActionResult> CreateMap(
         [FromBody] CreateMapDto dto)
     {
-        var map = await _mapService.CreateMapAsync(dto);
+        await _mapService.CreateMapAsync(dto);
 
-        return CreatedAtAction(
-            nameof(GetMap),
-            new { id = map.Id },
-            map);
+        return Ok(new {message = "Map created successfully"});
     }
 
     [Authorize(Roles = "Admin")]
@@ -51,11 +44,9 @@ public class MapsController : ControllerBase
         int id,
         [FromBody] UpdateMapDto dto)
     {
-        var map = await _mapService.UpdateMapAsync(
-            id,
-            dto);
+        await _mapService.UpdateMapAsync(id, dto);
 
-        return Ok(map);
+        return Ok();
     }
 
     [Authorize(Roles = "Admin")]

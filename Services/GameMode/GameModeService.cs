@@ -2,6 +2,7 @@
 using BE_ZSM.DTOs.GameModes;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
+using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,7 @@ public class GameModeService : IGameModeService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly IGenericRepository<GameMode> _gamemodeRepo;
 
     public GameModeService(
         IUnitOfWork unitOfWork,
@@ -18,13 +20,12 @@ public class GameModeService : IGameModeService
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _gamemodeRepo = _unitOfWork.GetRepository<GameMode>();
     }
 
     public async Task<List<GameModeResponseDto>> GetGameModesAsync()
     {
-        var repository = _unitOfWork.GetRepository<GameMode>();
-
-        var gameModes = await repository
+        var gameModes = await _gamemodeRepo
             .All()
             .AsNoTracking()
             .ToListAsync();
@@ -34,7 +35,7 @@ public class GameModeService : IGameModeService
 
     public async Task<GameModeResponseDto> GetGameModeAsync(int id)
     {
-        var gameMode = await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
+        var gameMode = await _gamemodeRepo.FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -46,7 +47,7 @@ public class GameModeService : IGameModeService
         return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
-    public async Task<GameModeResponseDto> CreateGameModeAsync(CreateGameModeDto dto)
+    public async Task CreateGameModeAsync(CreateGameModeDto dto)
     {
         var gameMode = new GameMode
         {
@@ -54,16 +55,14 @@ public class GameModeService : IGameModeService
             Description = dto.Description
         };
 
-        await _unitOfWork.GetRepository<GameMode>().CreateAsync(gameMode);
+        await _gamemodeRepo.CreateAsync(gameMode);
 
         await _unitOfWork.SaveChangesAsync();
-
-        return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
-    public async Task<GameModeResponseDto> UpdateGameModeAsync(int id, UpdateGameModeDto dto)
+    public async Task UpdateGameModeAsync(int id, UpdateGameModeDto dto)
     {
-        var gameMode = await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
+        var gameMode = await _gamemodeRepo.FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -74,13 +73,12 @@ public class GameModeService : IGameModeService
 
         _mapper.Map(dto, gameMode);
         await _unitOfWork.SaveChangesAsync();
-        return _mapper.Map<GameModeResponseDto>(gameMode);
     }
 
     public async Task DeleteGameModeAsync(int id)
     {
         var gameMode =
-            await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
+            await _gamemodeRepo.FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -89,7 +87,7 @@ public class GameModeService : IGameModeService
                 "GAME_MODE_NOT_FOUND");
         }
 
-        await _unitOfWork.GetRepository<GameMode>().DeleteAsync(gameMode);
+        await _gamemodeRepo.DeleteAsync(gameMode);
 
         await _unitOfWork.SaveChangesAsync();
     }   

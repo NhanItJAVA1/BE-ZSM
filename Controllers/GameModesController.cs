@@ -19,32 +19,21 @@ public class GameModesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetGameModes()
     {
-        var gameModes =
-            await _gameModeService.GetGameModesAsync();
-
-        return Ok(gameModes);
+        return Ok(await _gameModeService.GetGameModesAsync());
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetGameMode(int id)
     {
-        var gameMode =
-            await _gameModeService.GetGameModeAsync(id);
-
-        return Ok(gameMode);
+        return Ok(await _gameModeService.GetGameModeAsync(id));
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateGameMode(
-        [FromBody] CreateGameModeDto dto)
+    public async Task<IActionResult> CreateGameMode([FromBody] CreateGameModeDto dto)
     {
-        var gameMode =
-            await _gameModeService.CreateGameModeAsync(dto);
+        await _gameModeService.CreateGameModeAsync(dto);
 
-        return CreatedAtAction(
-            nameof(GetGameMode),
-            new { id = gameMode.Id },
-            gameMode);
+        return Ok();
     }
 
     [HttpPut("{id}")]
@@ -52,19 +41,14 @@ public class GameModesController : ControllerBase
         int id,
         [FromBody] UpdateGameModeDto dto)
     {
-        var gameMode =
-            await _gameModeService.UpdateGameModeAsync(
-                id,
-                dto);
-
-        return Ok(gameMode);
+        await _gameModeService.UpdateGameModeAsync(id, dto);
+        return Ok();
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteGameMode(int id)
     {
         await _gameModeService.DeleteGameModeAsync(id);
-
         return NoContent();
     }
 }

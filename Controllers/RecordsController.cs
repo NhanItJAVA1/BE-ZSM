@@ -47,6 +47,13 @@ public class RecordsController : ControllerBase
         return Ok(records);
     }
 
+    [HttpGet("/recommendations/maps/{mapId}/vehicles")]
+    public async Task<IActionResult> GetRecommendationVehicles(int mapId)
+    {
+        var result = await _recordService.GetRecommendationVehiclesAsync(mapId);
+        return Ok(result);
+    }
+
     [Authorize]
     [HttpPut("admin/records/{id}/approve")]
     public async Task<IActionResult> ApproveRecord(int id)
@@ -68,42 +75,35 @@ public class RecordsController : ControllerBase
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<RecordVideoDirectUploadResponseDto>>UploadVideo([FromForm] VideoUploadFormDto form)
     {
-        var result = await _recordService.UploadVideoAsync(form);
+        await _recordService.UploadVideoAsync(form);
 
         //Prometheus
         VideoUploadCounter.Inc();
-        return Ok(result);
+        return Ok();
     }
 
     [Authorize]
     [HttpPost("video-upload-url")]
     public ActionResult<RecordVideoUploadResponseDto> CreateVideoUploadUrl([FromBody] CreateRecordVideoUploadDto dto)
     {
-        var result = _recordService.CreateVideoUploadUrl(dto);
-        return Ok(result);
-    }
-
-    [HttpGet("/recommendations/maps/{mapId}/vehicles")]
-    public async Task<IActionResult> GetRecommendationVehicles(int mapId)
-    {
-        var result = await _recordService.GetRecommendationVehiclesAsync(mapId);
-        return Ok(result);
+        _recordService.CreateVideoUploadUrl(dto);
+        return Ok();
     }
 
     [Authorize]
     [HttpPost]
     public async Task<IActionResult> CreateRecord([FromBody] CreateRecordDto dto)
     {
-        var record = await _recordService.CreateRecordAsync(dto, User);
-        return CreatedAtAction(nameof(GetRecord), new { id = record.Id },  record);
+        await _recordService.CreateRecordAsync(dto, User);
+        return Ok();
     }
 
     [Authorize]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateRecord(int id,[FromBody] CreateRecordDto dto)
     {
-        var record = await _recordService.UpdateRecordAsync(id, dto);
-        return Ok(record);
+        await _recordService.UpdateRecordAsync(id, dto);
+        return Ok();
     }
 
     [Authorize]

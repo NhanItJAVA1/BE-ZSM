@@ -3,6 +3,7 @@ using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
+using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,7 @@ public class UserService : IUserService
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtService _jwtService;
     private readonly IMapper _mapper;
+    private readonly IGenericRepository<User> _userRepo;
 
     public UserService(
         IUnitOfWork unitOfWork,
@@ -21,10 +23,11 @@ public class UserService : IUserService
         _unitOfWork = unitOfWork;
         _jwtService = jwtService;
         _mapper = mapper;
+        _userRepo = _unitOfWork.GetRepository<User>();
     }
     public async Task<List<UserResponseDto>> GetUsersAsync()
     {
-        var users = await _unitOfWork.GetRepository<User>().All().Include(u => u.Role).AsNoTracking().ToListAsync();
+        var users = await _userRepo.All().Include(u => u.Role).AsNoTracking().ToListAsync();
 
         return _mapper.Map<List<UserResponseDto>>(users);
 
@@ -49,10 +52,9 @@ public class UserService : IUserService
         return _mapper.Map<UserResponseDto>(user);
     }
 
-    public async Task<UserResponseDto> RegisterAsync(RegisterUserDto dto)
+    public async Task RegisterAsync(RegisterUserDto dto)
     {
-        var userRepository =
-            _unitOfWork.GetRepository<User>();
+        var userRepository = _userRepo;
 
         var roleRepository =
             _unitOfWork.GetRepository<Role>();
@@ -104,12 +106,10 @@ public class UserService : IUserService
         await userRepository.CreateAsync(user);
 
         await _unitOfWork.SaveChangesAsync();
-
-        return _mapper.Map<UserResponseDto>(user);
     }
     public async Task<LoginResponseDto> LoginAsync(LoginUserDto dto)
     {
-        var user = await _unitOfWork.GetRepository<User>().Where(u => u.Username == dto.Username).Include(u => u.Role).FirstOrDefaultAsync();
+        var user = await _userRepo.Where(u => u.Username == dto.Username).Include(u => u.Role).FirstOrDefaultAsync();
 
         if (user == null)
         {
@@ -151,11 +151,9 @@ public class UserService : IUserService
         };
     }
 
-    public async Task<UserResponseDto> UpdateAsync(
-    int id,
-    UpdateUserDto dto)
+    public async Task UpdateAsync(int id, UpdateUserDto dto)
     {
-        var repository = _unitOfWork.GetRepository<User>();
+        var repository = _userRepo;
 
         var user = await repository
             .Where(u => u.Id == id)
@@ -186,14 +184,12 @@ public class UserService : IUserService
         await repository.UpdateAsync(user);
 
         await _unitOfWork.SaveChangesAsync();
-
-        return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task DeleteAsync(int id)
     {
         var user =
-            await _unitOfWork.GetRepository<User>().FindAsync(u => u.Id == id);
+            await _userRepo.FindAsync(u => u.Id == id);
 
         if (user == null)
         {
@@ -201,7 +197,7 @@ public class UserService : IUserService
                 "User not found",
                 "USER_NOT_FOUND");
         }
-        await _unitOfWork.GetRepository<User>().DeleteAsync(user);
+        await _userRepo.DeleteAsync(user);
         await _unitOfWork.SaveChangesAsync();
     }
 

@@ -24,18 +24,13 @@ namespace BE_ZSM.Controllers
         [HttpGet]
         public async Task<IActionResult> GetVehicles()
         {
-            var vehicles = await _vehicleService.GetVehiclesAsync();
-
-            return Ok(vehicles);
+            return Ok(await _vehicleService.GetVehiclesAsync());
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetVehicle(int id)
         {
-
-            var vehicle = await _vehicleService.GetVehicleAsync(id);
-
-            return Ok(vehicle);
+            return Ok(await _vehicleService.GetVehicleAsync(id));
         }
 
         [HttpPost]
@@ -43,13 +38,9 @@ namespace BE_ZSM.Controllers
         public async Task<IActionResult> CreateVehicle(
             CreateVehicleDto dto)
         {
-            var vehicle =
             await _vehicleService.CreateVehicleAsync(dto);
 
-            return CreatedAtAction(
-                nameof(GetVehicle),
-                new { id = vehicle.Id },
-                vehicle);
+            return Ok(new { message = "Vehicle created successfully" });
         }
 
         [HttpPut("{id}")]
@@ -58,10 +49,9 @@ namespace BE_ZSM.Controllers
             int id,
             UpdateVehicleDto dto)
         {
-            var vehicle =
             await _vehicleService.UpdateVehicleAsync(id, dto);
 
-            return Ok(vehicle);
+            return Ok();
         }
 
         [HttpDelete("{id}")]

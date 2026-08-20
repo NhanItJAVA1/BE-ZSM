@@ -8,9 +8,9 @@ namespace BE_ZSM.Services.Vehicle
 
         Task<VehicleResponseDto> GetVehicleAsync(int id);
 
-        Task<VehicleResponseDto> CreateVehicleAsync(CreateVehicleDto dto);
+        Task CreateVehicleAsync(CreateVehicleDto dto);
 
-        Task<VehicleResponseDto> UpdateVehicleAsync(
+        Task UpdateVehicleAsync(
             int id,
             UpdateVehicleDto dto);
 

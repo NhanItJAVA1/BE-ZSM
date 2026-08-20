@@ -1,5 +1,7 @@
+using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using Amazon.S3;
 using Amazon.S3.Model;
+using BE_ZSM.Services.Cache;
 
 namespace BE_ZSM.Services
 {
@@ -19,15 +21,16 @@ namespace BE_ZSM.Services
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
         private readonly string _region;
+        private readonly ICacheService _cache;
 
-
-        public S3PresignedUrlService(IAmazonS3 s3Client, IConfiguration configuration)
+        public S3PresignedUrlService(IAmazonS3 s3Client, IConfiguration configuration, ICacheService cache)
         {
             _s3Client = s3Client;
             _bucketName = configuration["AWS_BUCKET_NAME"]
                 ?? throw new InvalidOperationException("AWS_BUCKET_NAME is missing.");
             _region = configuration["AWS_REGION"]
                 ?? throw new InvalidOperationException("AWS_REGION is missing.");
+            _cache = cache;
         }
 
         public PresignedUploadResult CreateVideoUploadUrl(
@@ -135,28 +138,50 @@ namespace BE_ZSM.Services
                 publicUrl,
                 DateTime.UtcNow);
         }
-        public string CreateGetUrl(
-            string objectKey,
-            int expiresMinutes = 15){
+        public async Task<string> CreateGetUrl(string objectKey, int expiresMinutes = 15)
+        {
+            var cacheKey = $"presigned-url:{objectKey}";
+
+            var cachedUrl = await _cache.GetAsync<string>(cacheKey);
+
+            if (cachedUrl != null)
+            {
+                return cachedUrl;
+            }
+
+            var expiresAt = DateTime.UtcNow.AddMinutes(expiresMinutes);
+
             var request = new GetPreSignedUrlRequest
             {
                 BucketName = _bucketName,
                 Key = objectKey,
                 Verb = HttpVerb.GET,
-                Expires = DateTime.UtcNow.AddMinutes(expiresMinutes)
+                Expires = expiresAt
             };
 
-            return _s3Client.GetPreSignedURL(request);
+            var url = _s3Client.GetPreSignedURL(request);
+
+            await _cache.SetAsync(
+                cacheKey,
+                url,
+                TimeSpan.FromMinutes(
+                    Math.Max(1, expiresMinutes - 1)));
+
+            return url;
         }
 
-        public string? CreateGetUrlFromStoredUrl(string? storedUrl, int expiresMinutes = 15)
+        public async Task<string?> CreateGetUrlFromStoredUrl(string? storedUrl, int expiresMinutes = 15)
         {
             if (string.IsNullOrWhiteSpace(storedUrl))
             {
                 return null;
             }
 
-            return CreateGetUrl(GetObjectKeyFromUrl(storedUrl), expiresMinutes);
+            var objectKey = GetObjectKeyFromUrl(storedUrl);
+
+            return await CreateGetUrl(
+                objectKey,
+                expiresMinutes);
         }
 
         public string GetObjectKeyFromUrl(string url){

@@ -28,7 +28,7 @@ namespace BE_ZSM.Entities
 
         public DateTime CreatedAt { get; set; }
 
-        public DateTime UpdatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         public RecordStatus Status { get; set; } = RecordStatus.Pending;
 
