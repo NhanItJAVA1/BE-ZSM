@@ -1,7 +1,5 @@
 ﻿using BE_ZSM.Contexts;
 using BE_ZSM.Repositories.Generic;
-using BE_ZSM.Repositories.Interfaces;
-using BE_ZSM.Repositories.RefreshToken;
 
 namespace BE_ZSM.Repositories.UnitOfWork
 {
