@@ -2,9 +2,8 @@
 using BE_ZSM.DTOs.GameModes;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories.Interfaces;
-using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_ZSM.Services;
 
@@ -23,14 +22,19 @@ public class GameModeService : IGameModeService
 
     public async Task<List<GameModeResponseDto>> GetGameModesAsync()
     {
-        var gameModes = await _unitOfWork.GameModes.GetAllAsync();
+        var repository = _unitOfWork.GetRepository<GameMode>();
+
+        var gameModes = await repository
+            .All()
+            .AsNoTracking()
+            .ToListAsync();
 
         return _mapper.Map<List<GameModeResponseDto>>(gameModes);
     }
 
     public async Task<GameModeResponseDto> GetGameModeAsync(int id)
     {
-        var gameMode = await _unitOfWork.GameModes.GetByIdAsync(id);
+        var gameMode = await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -50,7 +54,7 @@ public class GameModeService : IGameModeService
             Description = dto.Description
         };
 
-        await _unitOfWork.GameModes.AddAsync(gameMode);
+        await _unitOfWork.GetRepository<GameMode>().CreateAsync(gameMode);
 
         await _unitOfWork.SaveChangesAsync();
 
@@ -59,7 +63,7 @@ public class GameModeService : IGameModeService
 
     public async Task<GameModeResponseDto> UpdateGameModeAsync(int id, UpdateGameModeDto dto)
     {
-        var gameMode = await _unitOfWork.GameModes.GetByIdAsync(id);
+        var gameMode = await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -76,7 +80,7 @@ public class GameModeService : IGameModeService
     public async Task DeleteGameModeAsync(int id)
     {
         var gameMode =
-            await _unitOfWork.GameModes.GetByIdAsync(id);
+            await _unitOfWork.GetRepository<GameMode>().FindAsync(g => g.Id == id);
 
         if (gameMode == null)
         {
@@ -85,7 +89,7 @@ public class GameModeService : IGameModeService
                 "GAME_MODE_NOT_FOUND");
         }
 
-        _unitOfWork.GameModes.Delete(gameMode);
+        await _unitOfWork.GetRepository<GameMode>().DeleteAsync(gameMode);
 
         await _unitOfWork.SaveChangesAsync();
     }   

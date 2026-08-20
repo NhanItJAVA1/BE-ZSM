@@ -108,15 +108,10 @@ public partial class Program
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddProblemDetails();
         builder.Services.AddScoped<IVehicleService, VehicleService>();
-        builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-        builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         builder.Services.AddScoped<IUserService, UserService>();
-        builder.Services.AddScoped<IRecordRepository,RecordRepository>();
         builder.Services.AddScoped<IRecordService,RecordService>();
         builder.Services.AddScoped<IUserService, UserService>();
-        builder.Services.AddScoped<IMapRepository, MapRepository>();
         builder.Services.AddScoped<IMapService, MapService>();
-        builder.Services.AddScoped<IGameModeRepository,GameModeRepository>();
         builder.Services.AddScoped<IGameModeService,GameModeService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
         builder.Services.AddStackExchangeRedisCache(options =>
