@@ -20,7 +20,5 @@ namespace BE_ZSM.Repositories.Generic
         Task DeleteRangeAsync(
             Expression<Func<T, bool>> predicate);
 
-        Task SaveChangesAsync();
-
     }
 }
