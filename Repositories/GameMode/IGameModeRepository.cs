@@ -1,5 +1,5 @@
 ﻿using BE_ZSM.Entities;
-using BE_ZSM.Services;
+using BE_ZSM.Repositories.Generic;
 using GameModeEntity = BE_ZSM.Entities.GameMode;
 
 namespace BE_ZSM.Repositories.Interfaces;

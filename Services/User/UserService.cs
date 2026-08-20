@@ -3,8 +3,8 @@ using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_ZSM.Services;
 public class UserService : IUserService
@@ -24,7 +24,7 @@ public class UserService : IUserService
     }
     public async Task<List<UserResponseDto>> GetUsersAsync()
     {
-        var users = await _unitOfWork.Users.GetAllWithRoleAsync();
+        var users = await _unitOfWork.GetRepository<User>().All().Include(u => u.Role).AsNoTracking().ToListAsync();
 
         return _mapper.Map<List<UserResponseDto>>(users);
 
@@ -32,7 +32,12 @@ public class UserService : IUserService
 
     public async Task<UserResponseDto> GetUserAsync(int id)
     {
-        var user = await _unitOfWork.Users.GetByIdWithRoleAsync(id);
+        var user = await _unitOfWork
+                .GetRepository<User>()
+                .Where(u => u.Id == id)
+                .Include(u => u.Role)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == id);
 
         if (user == null)
         {
@@ -44,12 +49,17 @@ public class UserService : IUserService
         return _mapper.Map<UserResponseDto>(user);
     }
 
-    public async Task<UserResponseDto> RegisterAsync(
-        RegisterUserDto dto)
+    public async Task<UserResponseDto> RegisterAsync(RegisterUserDto dto)
     {
-        var usernameExists =
-            await _unitOfWork.Users.ExistsByUsernameAsync(
-                dto.Username);
+        var userRepository =
+            _unitOfWork.GetRepository<User>();
+
+        var roleRepository =
+            _unitOfWork.GetRepository<Role>();
+
+        var usernameExists = await userRepository
+            .Where(u => u.Username == dto.Username)
+            .AnyAsync();
 
         if (usernameExists)
         {
@@ -58,10 +68,9 @@ public class UserService : IUserService
                 "USERNAME_ALREADY_EXISTS");
         }
 
-
-        var emailExists =
-            await _unitOfWork.Users.ExistsByEmailAsync(
-                dto.Email);
+        var emailExists = await userRepository
+            .Where(u => u.Email == dto.Email)
+            .AnyAsync();
 
         if (emailExists)
         {
@@ -70,9 +79,9 @@ public class UserService : IUserService
                 "EMAIL_ALREADY_EXISTS");
         }
 
-        var userRole =
-            await _unitOfWork.Roles.GetByNameAsync(
-                UserRole.User);
+        var userRole = await roleRepository
+            .Where(r => r.Name == UserRole.User)
+            .FirstOrDefaultAsync();
 
         if (userRole == null)
         {
@@ -88,22 +97,19 @@ public class UserService : IUserService
             BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
         user.RoleId = userRole.Id;
-        user.Role = userRole;
 
         user.CreatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
-        await _unitOfWork.Users.AddAsync(user);
+        await userRepository.CreateAsync(user);
+
         await _unitOfWork.SaveChangesAsync();
 
         return _mapper.Map<UserResponseDto>(user);
     }
-
     public async Task<LoginResponseDto> LoginAsync(LoginUserDto dto)
     {
-        var user =
-            await _unitOfWork.Users.GetByUsernameAsync(
-                dto.Username);
+        var user = await _unitOfWork.GetRepository<User>().Where(u => u.Username == dto.Username).Include(u => u.Role).FirstOrDefaultAsync();
 
         if (user == null)
         {
@@ -134,7 +140,7 @@ public class UserService : IUserService
             ExpiresAt = _jwtService.GetRefreshTokenExpiration()
         };
 
-        await _unitOfWork.RefreshTokens.AddAsync(refreshTokenEntity);
+        await _unitOfWork.GetRepository<RefreshToken>().CreateAsync(refreshTokenEntity);
         await _unitOfWork.SaveChangesAsync();
 
         return new LoginResponseDto
@@ -145,9 +151,16 @@ public class UserService : IUserService
         };
     }
 
-    public async Task<UserResponseDto> UpdateAsync(int id,UpdateUserDto dto)
+    public async Task<UserResponseDto> UpdateAsync(
+    int id,
+    UpdateUserDto dto)
     {
-        var user = await _unitOfWork.Users.GetByIdAsync(id);
+        var repository = _unitOfWork.GetRepository<User>();
+
+        var user = await repository
+            .Where(u => u.Id == id)
+            .FirstOrDefaultAsync();
+
         if (user == null)
         {
             throw new NotFoundException(
@@ -155,10 +168,9 @@ public class UserService : IUserService
                 "USER_NOT_FOUND");
         }
 
-        var emailExists =
-            await _unitOfWork.Users.ExistsByEmailAsync(
-                dto.Email,
-                id);
+        var emailExists = await repository
+            .Where(u => u.Email == dto.Email && u.Id != id)
+            .AnyAsync();
 
         if (emailExists)
         {
@@ -167,15 +179,21 @@ public class UserService : IUserService
                 "EMAIL_ALREADY_EXISTS");
         }
 
-        _unitOfWork.Users.Update(user);
+        _mapper.Map(dto, user);
+
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await repository.UpdateAsync(user);
+
         await _unitOfWork.SaveChangesAsync();
+
         return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task DeleteAsync(int id)
     {
         var user =
-            await _unitOfWork.Users.GetByIdAsync(id);
+            await _unitOfWork.GetRepository<User>().FindAsync(u => u.Id == id);
 
         if (user == null)
         {
@@ -183,14 +201,18 @@ public class UserService : IUserService
                 "User not found",
                 "USER_NOT_FOUND");
         }
-        _unitOfWork.Users.Delete(user);
+        await _unitOfWork.GetRepository<User>().DeleteAsync(user);
         await _unitOfWork.SaveChangesAsync();
     }
 
     public async Task<LoginResponseDto> RefreshTokenAsync(string token)
     {
-        var refreshToken =
-            await _unitOfWork.RefreshTokens.GetByTokenAsync(token);
+        var repository = _unitOfWork.GetRepository<RefreshToken>();
+        var refreshToken = await repository
+                .Where(rt => rt.Token == token)
+                .Include(rt => rt.User)
+                .ThenInclude(u => u.Role)
+                .FirstOrDefaultAsync();
 
         if (refreshToken == null ||
             refreshToken.RevokeAt != null ||

@@ -1,15 +1,12 @@
 ﻿using AutoMapper;
-using Azure;
 using BE_ZSM.DTOs.Records;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Helpers;
-using BE_ZSM.Repositories.Interfaces;
-using BE_ZSM.Repositories.UnitOfWork;
-using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-
+using BE_ZSM.Extensions;
 namespace BE_ZSM.Services;
 
 public class RecordService : IRecordService
@@ -33,7 +30,12 @@ public class RecordService : IRecordService
 
     public async Task<List<RecordResponseDto>> GetRecordsAsync()
     {
-        var records = await _unitOfWork.Records.GetAllApprovedAsync();
+        var repository = _unitOfWork.GetRepository<Record>();
+        var records = await repository
+            .Where(r => r.Status == Enums.RecordStatus.Approved)
+            .IncludeDetails()
+            .AsNoTracking()
+            .ToListAsync();
 
         var responses = _mapper.Map<List<RecordResponseDto>>(records);
         foreach (var response in responses)
@@ -65,7 +67,11 @@ public class RecordService : IRecordService
 
     public async Task<RecordResponseDto> GetRecordAsync(int id)
     {
-        var record = await _unitOfWork.Records.GetByIdAsync(id);
+        var record = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.Id == id)
+            .IncludeDetails()
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (record == null)
         {
@@ -79,7 +85,11 @@ public class RecordService : IRecordService
 
     public async Task<List<RecordResponseDto>> GetRecordsByUserAsync(int userId)
     {
-        var records = await _unitOfWork.Records.GetByUserIdAsync(userId);
+        var records = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.UserId == userId)
+            .IncludeDetails()
+            .AsNoTracking()
+            .ToListAsync();
 
         return _mapper.Map<List<RecordResponseDto>>(records);
     }
@@ -88,7 +98,12 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var records = await _unitOfWork.Records.GetPendingAsync();
+        var records = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.Status == Enums.RecordStatus.Pending)
+            .IncludeDetails()
+            .OrderByDescending(r => r.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync();
 
         return _mapper.Map<List<RecordResponseDto>>(records);
     }
@@ -96,7 +111,11 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.Id == id)
+            .IncludeDetails()
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (record == null)
         {
@@ -121,7 +140,11 @@ public class RecordService : IRecordService
     {
         await EnsureAdminAsync(user);
 
-        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.Id == id)
+            .IncludeDetails()
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (record == null)
         {
@@ -156,11 +179,15 @@ public class RecordService : IRecordService
         record.CreatedAt = DateTime.UtcNow;
         record.UpdatedAt = DateTime.UtcNow;
 
-        await _unitOfWork.Records.AddAsync(record);
+        await _unitOfWork.GetRepository<Record>().CreateAsync(record);
         await _unitOfWork.SaveChangesAsync();
 
         var savedRecord =
-            await _unitOfWork.Records.GetByIdAsync(record.Id);
+            await _unitOfWork.GetRepository<Record>()
+                .Where(r => r.Id == record.Id)
+                .IncludeDetails()
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
 
 
         if (savedRecord == null)
@@ -175,7 +202,7 @@ public class RecordService : IRecordService
     }
     public async Task<RecordResponseDto> UpdateRecordAsync(int id, CreateRecordDto dto)
     {
-        var record = await _unitOfWork.Records.GetEntityByIdAsync(id);
+        var record = await _unitOfWork.GetRepository<Record>().FindAsync(r => r.Id == id);
 
         if (record == null)
         {
@@ -190,7 +217,11 @@ public class RecordService : IRecordService
 
         await _unitOfWork.SaveChangesAsync();
 
-        var updatedRecord = await _unitOfWork.Records.GetByIdAsync(id);
+        var updatedRecord = await _unitOfWork.GetRepository<Record>()
+            .Where(r => r.Id == id)
+            .IncludeDetails()
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (updatedRecord == null)
         {
@@ -222,8 +253,9 @@ public class RecordService : IRecordService
     }
     public async Task DeleteRecordAsync(int id)
     {
-        var record =
-            await _unitOfWork.Records.GetEntityByIdAsync(id);
+        var repository = _unitOfWork.GetRepository<Record>();
+        var record = await repository.FindAsync(r => r.Id == id);
+
 
         if (record == null)
         {
@@ -232,7 +264,7 @@ public class RecordService : IRecordService
                 "RECORD_NOT_FOUND");
         }
 
-        _unitOfWork.Records.Delete(record);
+        await repository.DeleteAsync(record);
 
         await _unitOfWork.SaveChangesAsync();
     }
@@ -286,7 +318,11 @@ public class RecordService : IRecordService
     public async Task<List<RecordRecommendationDto>>
     GetRecommendationVehiclesAsync(int mapId)
     {
-        var records = await _unitOfWork.Records.GetApprovedByMapIdAsync(mapId);
+        var records = await _unitOfWork.GetRepository<Record>()
+            .Where(r =>
+                r.MapId == mapId &&
+                r.Status == Enums.RecordStatus.Approved)
+            .ToListAsync();
 
         var vehicles = records
             .GroupBy(r => r.VehicleId)
@@ -310,7 +346,10 @@ public class RecordService : IRecordService
             .Select(v => v.VehicleId)
             .ToList();
 
-        var vehicleEntities = await _unitOfWork.Vehicles.GetByIdsAsync(vehicleIds);
+        var vehicleEntities = await _unitOfWork.GetRepository<Entities.Vehicle>()
+            .Where(v => vehicleIds.Contains(v.Id))
+            .AsNoTracking()
+            .ToListAsync();
 
         return vehicles
             .Select(v =>

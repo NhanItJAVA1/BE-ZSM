@@ -1,5 +1,5 @@
 ﻿using BE_ZSM.Entities;
-using BE_ZSM.Services;
+using BE_ZSM.Repositories.Generic;
 using RecordEntity = BE_ZSM.Entities.Record;
 
 namespace BE_ZSM.Repositories.Interfaces;

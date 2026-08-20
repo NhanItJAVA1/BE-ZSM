@@ -1,26 +1,9 @@
-﻿using BE_ZSM.Repositories.Interfaces;
-using BE_ZSM.Repositories.RefreshToken;
-using BE_ZSM.Repositories.Role;
-using BE_ZSM.Repositories.Vehicle;
+﻿using BE_ZSM.Repositories.Generic;
 
-namespace BE_ZSM.Repositories.UnitOfWork
+public interface IUnitOfWork
 {
-    public interface IUnitOfWork
-    {
-        IUserRepository Users { get; }
+    IGenericRepository<TEntity> GetRepository<TEntity>()
+        where TEntity : class;
 
-        IRoleRepository Roles { get; }
-
-        IRefreshTokenRepository RefreshTokens { get; }
-
-        IVehicleRepository Vehicles { get; }
-
-        IRecordRepository Records { get; }
-
-        IMapRepository Maps { get; }
-
-        IGameModeRepository GameModes { get; }
-
-        Task<int> SaveChangesAsync();
-    }
+    Task<int> SaveChangesAsync();
 }

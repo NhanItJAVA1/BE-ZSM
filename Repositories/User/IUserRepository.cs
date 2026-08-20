@@ -1,5 +1,5 @@
 ﻿using BE_ZSM.Entities;
-using BE_ZSM.Services;
+using BE_ZSM.Repositories.Generic;
 
 namespace BE_ZSM.Repositories.Interfaces;
 

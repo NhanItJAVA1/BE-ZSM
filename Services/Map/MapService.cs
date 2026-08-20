@@ -1,11 +1,10 @@
-﻿using Amazon.Runtime.Internal.Util;
-using AutoMapper;
+﻿using AutoMapper;
 using BE_ZSM.DTOs.Maps;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_ZSM.Services;
 
@@ -38,7 +37,7 @@ public class MapService : IMapService
             return cached;
         }
 
-        var maps = await _unitOfWork.Maps.GetAllAsync();
+        var maps = await _unitOfWork.GetRepository<Map>().All().AsNoTracking().ToListAsync();
 
         var responses = _mapper.Map<List<MapResponseDto>>(maps);
 
@@ -47,14 +46,14 @@ public class MapService : IMapService
             response.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(response.ImageUrl);
         }
         
-        await _cache.SetAsync(CacheKey, responses, TimeSpan.FromMinutes(30));
+        await _cache.SetAsync(CacheKey, responses, TimeSpan.FromMinutes(15));
 
         return responses;
     }
 
     public async Task<MapResponseDto> GetMapAsync(int id)
     {
-        var map = await _unitOfWork.Maps.GetByIdAsync(id);
+        var map = await _unitOfWork.GetRepository<Map>().FindAsync(m => m.Id == id);
 
         if (map == null)
         {
@@ -72,8 +71,7 @@ public class MapService : IMapService
         var map = _mapper.Map<Map>(dto);
         map.CreatedAt = DateTime.UtcNow;
 
-        await _unitOfWork.Maps.AddAsync(map);
-
+        await _unitOfWork.GetRepository<Map>().CreateAsync(map);
         await _unitOfWork.SaveChangesAsync();
 
         return _mapper.Map<MapResponseDto>(map);
@@ -81,7 +79,7 @@ public class MapService : IMapService
 
     public async Task<MapResponseDto> UpdateMapAsync(int id, UpdateMapDto dto)
     {
-        var map = await _unitOfWork.Maps.GetByIdAsync(id);
+        var map = await _unitOfWork.GetRepository<Map>().FindAsync(m => m.Id == id);
 
         if (map == null)
         {
@@ -100,7 +98,7 @@ public class MapService : IMapService
 
     public async Task DeleteMapAsync(int id)
     {
-        var map = await _unitOfWork.Maps.GetByIdAsync(id);
+        var map = await _unitOfWork.GetRepository<Map>().FindAsync(m => m.Id == id);
 
         if (map == null)
         {
@@ -109,7 +107,7 @@ public class MapService : IMapService
                 "MAP_NOT_FOUND");
         }
 
-        _unitOfWork.Maps.Delete(map);
+        await _unitOfWork.GetRepository<Map>().DeleteAsync(map);
 
         await _unitOfWork.SaveChangesAsync();
     }

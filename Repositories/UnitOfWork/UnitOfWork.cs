@@ -1,41 +1,36 @@
 ﻿using BE_ZSM.Contexts;
+using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Repositories.Interfaces;
 using BE_ZSM.Repositories.RefreshToken;
-using BE_ZSM.Repositories.Role;
-using BE_ZSM.Repositories.Vehicle;
-using BE_ZSM.Services.Cache;
 
 namespace BE_ZSM.Repositories.UnitOfWork
 {
     public class UnitOfWork : IUnitOfWork
     {
         private readonly AppDbContext _context;
-        public IUserRepository Users { get; }
 
-        public IRoleRepository Roles { get; }
+        private readonly Dictionary<Type, object> _repositories = new();
 
-        public IRefreshTokenRepository RefreshTokens { get; }
-
-        public IVehicleRepository Vehicles { get; }
-
-        public IRecordRepository Records { get; }
-
-        public IMapRepository Maps { get; }
-
-        public IGameModeRepository GameModes { get; }
-        public ICacheService CacheService { get; }
-        public UnitOfWork(AppDbContext context, IUserRepository users, IRoleRepository roles, IRefreshTokenRepository refreshTokens, IVehicleRepository vehicles, IRecordRepository records, IMapRepository maps, IGameModeRepository gameModes, ICacheService cacheService)
+        public UnitOfWork(AppDbContext context)
         {
             _context = context;
-            Users = users;
-            Roles = roles;
-            RefreshTokens = refreshTokens;
-            Vehicles = vehicles;
-            Records = records;
-            Maps = maps;
-            GameModes = gameModes;
-            CacheService = cacheService;
         }
+
+        public IGenericRepository<TEntity> GetRepository<TEntity>()
+            where TEntity : class
+        {
+            var type = typeof(TEntity);
+
+            if (!_repositories.TryGetValue(type, out var repository))
+            {
+                repository = new GenericRepository<TEntity>(_context);
+
+                _repositories.Add(type, repository);
+            }
+
+            return (IGenericRepository<TEntity>)repository;
+        }
+
         public async Task<int> SaveChangesAsync()
         {
             return await _context.SaveChangesAsync();

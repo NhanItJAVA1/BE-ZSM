@@ -1,5 +1,5 @@
 ﻿using BE_ZSM.Enums;
-using BE_ZSM.Services;
+using BE_ZSM.Repositories.Generic;
 using RoleEntity = BE_ZSM.Entities.Role;
 
 namespace BE_ZSM.Repositories.Role;

@@ -1,16 +1,13 @@
 ﻿using AutoMapper;
-using BE_ZSM.DTOs.Maps;
 using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Exceptions;
-using BE_ZSM.Repositories.UnitOfWork;
-using BE_ZSM.Repositories.Vehicle;
 using BE_ZSM.Services.Cache;
+using Microsoft.EntityFrameworkCore;
 
 namespace BE_ZSM.Services.Vehicle
 {
     public class VehicleService : IVehicleService
     {
-        private readonly IVehicleRepository _vehicleRepository;
         private readonly S3PresignedUrlService _presignedUrlService;
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
@@ -19,13 +16,11 @@ namespace BE_ZSM.Services.Vehicle
 
         public VehicleService(
             ICacheService cache,
-        IVehicleRepository vehicleRepository,
-        S3PresignedUrlService presignedUrlService,
-        IMapper mapper,
-        IUnitOfWork unitOfWork)
+            S3PresignedUrlService presignedUrlService,
+            IMapper mapper,
+            IUnitOfWork unitOfWork)
         {
             _cache = cache;
-            _vehicleRepository = vehicleRepository;
             _presignedUrlService = presignedUrlService;
             _mapper = mapper;
             _unitOfWork = unitOfWork;
@@ -36,7 +31,9 @@ namespace BE_ZSM.Services.Vehicle
             var vehicle = _mapper.Map<Entities.Vehicle>(dto);
             vehicle.CreatedAt = DateTime.UtcNow;
 
-            await _vehicleRepository.AddAsync(vehicle);
+            var repository = _unitOfWork.GetRepository<Entities.Vehicle>();
+
+            await repository.CreateAsync(vehicle);
             await _unitOfWork.SaveChangesAsync();
 
             return _mapper.Map<VehicleResponseDto>(vehicle);
@@ -44,7 +41,9 @@ namespace BE_ZSM.Services.Vehicle
 
         public async Task DeleteVehicleAsync(int id)
         {
-            var vehicle = await _vehicleRepository.GetByIdAsync(id);
+            var repository = _unitOfWork.GetRepository<Entities.Vehicle>();
+
+            var vehicle = await repository.FindAsync(v => v.Id == id);
 
             if (vehicle == null)
             {
@@ -53,14 +52,14 @@ namespace BE_ZSM.Services.Vehicle
                     "VEHICLE_NOT_FOUND");
             }
 
-            _vehicleRepository.Delete(vehicle);
-
+            await repository.DeleteAsync(vehicle);
             await _unitOfWork.SaveChangesAsync();
         }
 
         public async Task<VehicleResponseDto> GetVehicleAsync(int id)
         {
-            var vehicle = await _vehicleRepository.GetByIdAsync(id);
+            var repository = _unitOfWork.GetRepository<Entities.Vehicle>();
+            var vehicle = await repository.FindAsync(v => v.Id == id);
 
             if (vehicle == null)
             {
@@ -85,7 +84,8 @@ namespace BE_ZSM.Services.Vehicle
             {
                 return cached;
             }
-            var vehicles = await _vehicleRepository.GetAllAsync();
+            var repository = _unitOfWork.GetRepository<Entities.Vehicle>();
+            var vehicles = await repository.All().AsNoTracking().ToListAsync();
             var responses = _mapper.Map<List<VehicleResponseDto>>(vehicles);
 
             responses.ForEach(x => x.ImageUrl = _presignedUrlService.CreateGetUrlFromStoredUrl(x.ImageUrl));
@@ -97,7 +97,8 @@ namespace BE_ZSM.Services.Vehicle
 
         public async Task<VehicleResponseDto> UpdateVehicleAsync(int id, UpdateVehicleDto dto)
         {
-            var vehicle = await _vehicleRepository.GetByIdAsync(id);
+            var repository = _unitOfWork.GetRepository<Entities.Vehicle>();
+            var vehicle = await repository.FindAsync(v => v.Id == id);
 
             if (vehicle == null)
             {
