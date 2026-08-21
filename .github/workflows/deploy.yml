@@ -68,6 +68,8 @@ jobs:
     needs: docker
     runs-on: ubuntu-latest
 
+    environment: "Ci/CD Git Actions"
+
     steps:
       - name: Deploy
         uses: appleboy/ssh-action@v1.2.2
