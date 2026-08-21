@@ -38,6 +38,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
 
+    environment: "Ci/CD Git Actions"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,11 +53,11 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build \
-            -t huynhtrongnhan98/zsm-backend:latest .
+            -t huynhtrongnhan98/zsm-backend:${{ github.sha }} .
 
       - name: Push Docker Image
         run: |
-          docker push huynhtrongnhan98/zsm-backend:latest
+          docker push huynhtrongnhan98/zsm-backend:${{ github.sha }}
 
 
   # =========================
