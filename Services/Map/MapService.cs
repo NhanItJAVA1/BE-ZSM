@@ -3,7 +3,6 @@ using BE_ZSM.DTOs.Maps;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Generic;
-using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,9 +15,7 @@ public class MapService : IMapService
     private readonly IGenericRepository<Map> _mapRepo;
     private readonly IMapper _mapper;
 
-    public MapService(
-        ICacheService cache,
-        IUnitOfWork unitOfWork,
+    public MapService(        IUnitOfWork unitOfWork,
         S3PresignedUrlService presignedUrlService,
         IMapper mapper)
     {

@@ -2,9 +2,11 @@
 using BE_ZSM.DTOs.GameModes;
 using BE_ZSM.DTOs.Maps;
 using BE_ZSM.DTOs.Records;
+using BE_ZSM.DTOs.Todos;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Entities;
+using BE_ZSM.Enums;
 public class MappingProfile : Profile
 {
     public MappingProfile()
@@ -43,5 +45,33 @@ public class MappingProfile : Profile
         CreateMap<GameMode, GameModeResponseDto>();
         CreateMap<CreateGameModeDto, GameMode>();
         CreateMap<UpdateGameModeDto, GameMode>();
+
+        CreateMap<Todo, TodoDto>();
+
+        CreateMap<CreateTodoDto, Todo>()
+            .ForMember(dest => dest.Id,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.UserId,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.User,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.Status,
+                opt => opt.MapFrom(_ => TodoStatus.Todo))
+            .ForMember(dest => dest.CreatedAt,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt,
+                opt => opt.Ignore());
+
+        CreateMap<UpdateTodoDto, Todo>()
+            .ForMember(dest => dest.Id,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.UserId,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.User,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt,
+                opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt,
+                opt => opt.MapFrom(_ => DateTime.UtcNow));
     }
 }

@@ -22,13 +22,16 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.11" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="BE-ZSM.Tests\MapService\" />
     <Folder Include="Migrations\" />
     <Folder Include="Configurations\" />
+    <Folder Include="Todos\" />
   </ItemGroup>
 
   <ItemGroup>

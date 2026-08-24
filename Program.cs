@@ -107,18 +107,12 @@ public partial class Program
         builder.Services.AddScoped<IMapService, MapService>();
         builder.Services.AddScoped<IGameModeService,GameModeService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-        builder.Services.AddStackExchangeRedisCache(options =>
-        {
-            options.Configuration =
-                builder.Configuration.GetConnectionString("Redis");
+        builder.Services.AddStackExchangeRedisCache(options =>{
+            options.Configuration = builder.Configuration.GetConnectionString("Redis");
         });
         builder.Services.AddScoped<ICacheService, CacheService>();
-        builder.Services.AddAutoMapper(
-            cfg => { },
-            typeof(MappingProfile)
-        );
-        builder.Services.AddScoped(typeof(IGenericRepository<>),
-                           typeof(GenericRepository<>));
+        builder.Services.AddAutoMapper(cfg => { }, typeof(MappingProfile));
+        builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
 
         builder.Services.AddSingleton<IAmazonS3>(_ =>
             new AmazonS3Client(

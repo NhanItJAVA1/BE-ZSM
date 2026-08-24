@@ -24,5 +24,6 @@
 
         public ICollection<Record> Records { get; set; } = new List<Record>();
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+        public ICollection<Todo> Todos { get; set; } = [];
     }
 }
