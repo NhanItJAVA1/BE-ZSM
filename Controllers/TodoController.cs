@@ -19,10 +19,10 @@ public class TodoController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetTodos()
+    public async Task<IActionResult> GetTodos([FromQuery] TodoQueryDto query)
     {
         var userId = GetCurrentUserId();
-        var todos = await _todoService.GetTodosAsync(userId);
+        var todos = await _todoService.GetTodosAsync(userId, query);
         return Ok(todos);
     }
 
@@ -56,6 +56,22 @@ public class TodoController : ControllerBase
         });
     }
 
+    [HttpPatch("{id:int}/status")]
+    public async Task<IActionResult> UpdateStatus(int id, UpdateTodoStatusDto dto)
+    {
+        var userId = GetCurrentUserId();
+
+        await _todoService.UpdateTodoStatusAsync(
+            id,
+            userId,
+            dto);
+
+        return Ok(new
+        {
+            message = "Todo status updated successfully"
+        });
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteTodo(int id)
     {
@@ -76,5 +92,12 @@ public class TodoController : ControllerBase
         }
 
         return int.Parse(userIdClaim.Value);
+    }
+
+    [HttpGet("{id:int}/activities")]
+    public async Task<IActionResult> GetActivities(int id)
+    {
+        var result = await _todoService.GetActivitiesAsync(id, GetCurrentUserId());
+        return Ok(result);
     }
 }

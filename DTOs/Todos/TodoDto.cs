@@ -19,5 +19,10 @@ namespace BE_ZSM.DTOs.Todos
         public DateTime CreatedAt { get; set; }
 
         public DateTime? UpdatedAt { get; set; }
+        public bool IsOverdue { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public bool IsCompletedLate { get; set; }
+        public int? CategoryId { get; set; }
+        public string? CategoryName { get; set; }
     }
 }

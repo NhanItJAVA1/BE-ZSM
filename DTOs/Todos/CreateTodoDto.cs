@@ -11,5 +11,6 @@ namespace BE_ZSM.DTOs.Todos
         public TodoPriority Priority { get; set; } = TodoPriority.Medium;
 
         public DateTime? DueDate { get; set; }
+        public int? CategoryId { get; set; }
     }
 }

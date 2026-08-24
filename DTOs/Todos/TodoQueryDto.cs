@@ -17,5 +17,7 @@ namespace BE_ZSM.DTOs.Todos
         public string? SortBy { get; set; }
 
         public bool IsDescending { get; set; }
+        public bool? IsOverdue { get; set; }
+        public int? CategoryId { get; set; }
     }
 }

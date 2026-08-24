@@ -7,7 +7,9 @@ using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services;
 using BE_ZSM.Services.Cache;
+using BE_ZSM.Services.Category;
 using BE_ZSM.Services.Interfaces;
+using BE_ZSM.Services.TodoService;
 using BE_ZSM.Services.Vehicle;
 using DotNetEnv;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -17,6 +19,7 @@ using Microsoft.OpenApi;
 using Prometheus;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 public partial class Program
 {
     private static void Main(string[] args)
@@ -28,7 +31,11 @@ public partial class Program
         var awsSecretAccessKey = GetRequiredEnvironmentVariable("SECRET_ACCESS_KEY");
         var awsRegion = GetRequiredEnvironmentVariable("AWS_REGION");
 
-        builder.Services.AddControllers();
+        builder.Services.AddControllers().AddJsonOptions(options =>
+        {
+            options.JsonSerializerOptions.Converters.Add(
+                new JsonStringEnumConverter());
+        });
 
 
         var connectionString =
@@ -107,6 +114,8 @@ public partial class Program
         builder.Services.AddScoped<IMapService, MapService>();
         builder.Services.AddScoped<IGameModeService,GameModeService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+        builder.Services.AddScoped<ITodoService, TodoService>();
+        builder.Services.AddScoped<ITodoCategoryService, TodoCategoryService>();
         builder.Services.AddStackExchangeRedisCache(options =>{
             options.Configuration = builder.Configuration.GetConnectionString("Redis");
         });

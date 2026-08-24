@@ -4,6 +4,7 @@ using BE_ZSM.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BE_ZSM.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260824060229_AddCompletedAtToTodo")]
+    partial class AddCompletedAtToTodo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -209,9 +212,6 @@ namespace BE_ZSM.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("CategoryId")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("datetime2");
 
@@ -246,64 +246,9 @@ namespace BE_ZSM.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CategoryId");
-
                     b.HasIndex("UserId");
 
-                    b.ToTable("Todos");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.TodoActivity", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<int>("TodoId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TodoId");
-
-                    b.ToTable("TodoActivities");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.TodoCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("TodoCategories");
+                    b.ToTable("Todo");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.User", b =>
@@ -432,37 +377,8 @@ namespace BE_ZSM.Migrations
 
             modelBuilder.Entity("BE_ZSM.Entities.Todo", b =>
                 {
-                    b.HasOne("BE_ZSM.Entities.TodoCategory", "Category")
-                        .WithMany("Todos")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.NoAction);
-
                     b.HasOne("BE_ZSM.Entities.User", "User")
                         .WithMany("Todos")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Category");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.TodoActivity", b =>
-                {
-                    b.HasOne("BE_ZSM.Entities.Todo", "Todo")
-                        .WithMany("Activities")
-                        .HasForeignKey("TodoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Todo");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.TodoCategory", b =>
-                {
-                    b.HasOne("BE_ZSM.Entities.User", "User")
-                        .WithMany("TodoCategories")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -496,23 +412,11 @@ namespace BE_ZSM.Migrations
                     b.Navigation("Users");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.Todo", b =>
-                {
-                    b.Navigation("Activities");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.TodoCategory", b =>
-                {
-                    b.Navigation("Todos");
-                });
-
             modelBuilder.Entity("BE_ZSM.Entities.User", b =>
                 {
                     b.Navigation("Records");
 
                     b.Navigation("RefreshTokens");
-
-                    b.Navigation("TodoCategories");
 
                     b.Navigation("Todos");
                 });

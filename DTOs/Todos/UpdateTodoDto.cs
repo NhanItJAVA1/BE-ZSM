@@ -8,10 +8,9 @@ namespace BE_ZSM.DTOs.Todos
 
         public string? Description { get; set; }
 
-        public TodoStatus Status { get; set; }
-
         public TodoPriority Priority { get; set; }
 
         public DateTime? DueDate { get; set; }
+        public int? CategoryId { get; set; }
     }
 }

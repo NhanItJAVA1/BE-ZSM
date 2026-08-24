@@ -13,6 +13,9 @@ namespace BE_ZSM.Contexts
         public DbSet<Vehicle> Vehicles { get; set; }
         public DbSet<GameMode> GameModes { get; set; }
         public DbSet<Record> Records { get; set; }
+        public DbSet<Todo> Todos { get; set; }
+        public DbSet<TodoCategory> TodoCategories { get; set; }
+        public DbSet<TodoActivity> TodoActivities { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
@@ -36,6 +39,7 @@ namespace BE_ZSM.Contexts
                     new Role { Id = 1, Name = Enums.UserRole.User, Description = "Regular User" }
                 );
             });
+
             modelBuilder.Entity<Todo>(entity =>
             {
                 entity.HasKey(t => t.Id);
@@ -62,6 +66,46 @@ namespace BE_ZSM.Contexts
                     .WithMany(u => u.Todos)
                     .HasForeignKey(t => t.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(t => t.Category)
+                    .WithMany(c => c.Todos)
+                    .HasForeignKey(t => t.CategoryId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasMany(t => t.Activities)
+                    .WithOne(a => a.Todo)
+                    .HasForeignKey(a => a.TodoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<TodoCategory>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.Property(c => c.Name)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.HasOne(c => c.User)
+                    .WithMany(u => u.TodoCategories)
+                    .HasForeignKey(c => c.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<TodoActivity>(entity =>
+            {
+                entity.HasKey(a => a.Id);
+
+                entity.Property(a => a.Type)
+                    .HasConversion<string>()
+                    .IsRequired();
+
+                entity.Property(a => a.Description)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.Property(a => a.CreatedAt)
+                    .IsRequired();
             });
 
         }
