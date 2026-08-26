@@ -60,50 +60,24 @@ namespace BE_ZSM.Services.TodoService
             if (queryDto.IsOverdue.HasValue)
             {
                 query = queryDto.IsOverdue.Value
-                    ? query.Where(t =>
-                        t.DueDate.HasValue &&
-                        t.DueDate.Value < now &&
-                        t.Status != TodoStatus.Done)
-                    : query.Where(t =>
-                        !t.DueDate.HasValue ||
-                        t.DueDate.Value >= now ||
-                        t.Status == TodoStatus.Done);
+                    ? query.Where(t => t.DueDate.HasValue && t.DueDate.Value < now && t.Status != TodoStatus.Done)
+                    : query.Where(t => !t.DueDate.HasValue || t.DueDate.Value >= now || t.Status == TodoStatus.Done);
             }
 
             var totalItems = await query.CountAsync();
 
             query = queryDto.SortBy?.ToLower() switch
             {
-                "title" => queryDto.IsDescending
-                    ? query.OrderByDescending(t => t.Title)
-                    : query.OrderBy(t => t.Title),
-
-                "priority" => queryDto.IsDescending
-                    ? query.OrderByDescending(t => t.Priority)
-                    : query.OrderBy(t => t.Priority),
-
-                "status" => queryDto.IsDescending
-                    ? query.OrderByDescending(t => t.Status)
-                    : query.OrderBy(t => t.Status),
-
-                "duedate" => queryDto.IsDescending
-                    ? query.OrderByDescending(t => t.DueDate)
-                    : query.OrderBy(t => t.DueDate),
-
-                "createdat" => queryDto.IsDescending
-                    ? query.OrderByDescending(t => t.CreatedAt)
-                    : query.OrderBy(t => t.CreatedAt),
-
+                "title" => queryDto.IsDescending ? query.OrderByDescending(t => t.Title) : query.OrderBy(t => t.Title),
+                "priority" => queryDto.IsDescending ? query.OrderByDescending(t => t.Priority) : query.OrderBy(t => t.Priority),
+                "status" => queryDto.IsDescending ? query.OrderByDescending(t => t.Status) : query.OrderBy(t => t.Status),
+                "duedate" => queryDto.IsDescending ? query.OrderByDescending(t => t.DueDate) : query.OrderBy(t => t.DueDate),
+                "createdat" => queryDto.IsDescending ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt),
                 _ => query.OrderByDescending(t => t.CreatedAt)
             };
-
-            var page = queryDto.Page < 1
-                ? 1
-                : queryDto.Page;
-
-            var pageSize = queryDto.PageSize < 1
-                ? 10
-                : queryDto.PageSize;
+            
+            var page = queryDto.Page < 1 ? 1 : queryDto.Page;
+            var pageSize = queryDto.PageSize < 1 ? 10 : queryDto.PageSize;
 
             if (pageSize > 100) pageSize = 100;
 
@@ -120,8 +94,7 @@ namespace BE_ZSM.Services.TodoService
                 Page = page,
                 PageSize = pageSize,
                 TotalItems = totalItems,
-                TotalPages = (int)Math.Ceiling(
-                    totalItems / (double)pageSize)
+                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
             };
         }
 
@@ -203,7 +176,6 @@ namespace BE_ZSM.Services.TodoService
             todo.CompletedAt = dto.Status == TodoStatus.Done ? now : null;
 
             await AddActivityAsync(todo.Id, TodoActivityType.StatusChanged, $"Status changed from {oldStatus} to {dto.Status}");
-
             await _unitOfWork.SaveChangesAsync();
         }
 

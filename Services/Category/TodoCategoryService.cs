@@ -19,9 +19,7 @@ namespace BE_ZSM.Services.Category
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
-
             _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
-
             _todoRepo = _unitOfWork.GetRepository<Todo>();
         }
 
@@ -36,24 +34,17 @@ namespace BE_ZSM.Services.Category
             return _mapper.Map<List<TodoCategoryDto>>(categories);
         }
 
-        public async Task<TodoCategoryDto> GetCategoryAsync(
-            int id,
-            int userId)
+        public async Task<TodoCategoryDto> GetCategoryAsync(int id, int userId)
         {
-            var category = await _categoryRepo.FindAsync(
-                c => c.Id == id && c.UserId == userId);
+            var category = await _categoryRepo.FindAsync(c => c.Id == id && c.UserId == userId);
 
             if (category == null)
-                throw new NotFoundException(
-                    "Category not found",
-                    "CATEGORY_NOT_FOUND");
+                throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
 
             return _mapper.Map<TodoCategoryDto>(category);
         }
 
-        public async Task CreateCategoryAsync(
-            CreateTodoCategoryDto dto,
-            int userId)
+        public async Task CreateCategoryAsync(CreateTodoCategoryDto dto, int userId)
         {
             var category = _mapper.Map<TodoCategory>(dto);
 
@@ -63,21 +54,14 @@ namespace BE_ZSM.Services.Category
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task UpdateCategoryAsync(
-            int id,
-            UpdateTodoCategoryDto dto,
-            int userId)
+        public async Task UpdateCategoryAsync(int id, UpdateTodoCategoryDto dto, int userId)
         {
-            var category = await _categoryRepo.FindAsync(
-                c => c.Id == id && c.UserId == userId);
+            var category = await _categoryRepo.FindAsync(c => c.Id == id && c.UserId == userId);
 
             if (category == null)
-                throw new NotFoundException(
-                    "Category not found",
-                    "CATEGORY_NOT_FOUND");
+                throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
 
             _mapper.Map(dto, category);
-
             await _unitOfWork.SaveChangesAsync();
         }
 

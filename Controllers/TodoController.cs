@@ -61,10 +61,7 @@ public class TodoController : ControllerBase
     {
         var userId = GetCurrentUserId();
 
-        await _todoService.UpdateTodoStatusAsync(
-            id,
-            userId,
-            dto);
+        await _todoService.UpdateTodoStatusAsync(id, userId, dto);
 
         return Ok(new
         {
