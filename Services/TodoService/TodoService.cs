@@ -3,6 +3,7 @@ using BE_ZSM.DTOs.Todos;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
+using BE_ZSM.Extensions;
 using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Responses;
 using Microsoft.EntityFrameworkCore;
@@ -46,9 +47,7 @@ namespace BE_ZSM.Services.TodoService
                 var search = queryDto.Search.Trim();
 
                 query = query.Where(t =>
-                    t.Title.Contains(search) ||
-                    (t.Description != null &&
-                     t.Description.Contains(search)));
+                    t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
             }
 
             if (queryDto.Status.HasValue) query = query.Where(t => t.Status == queryDto.Status.Value);
@@ -63,9 +62,6 @@ namespace BE_ZSM.Services.TodoService
                     ? query.Where(t => t.DueDate.HasValue && t.DueDate.Value < now && t.Status != TodoStatus.Done)
                     : query.Where(t => !t.DueDate.HasValue || t.DueDate.Value >= now || t.Status == TodoStatus.Done);
             }
-
-            var totalItems = await query.CountAsync();
-
             query = queryDto.SortBy?.ToLower() switch
             {
                 "title" => queryDto.IsDescending ? query.OrderByDescending(t => t.Title) : query.OrderBy(t => t.Title),
@@ -75,27 +71,8 @@ namespace BE_ZSM.Services.TodoService
                 "createdat" => queryDto.IsDescending ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt),
                 _ => query.OrderByDescending(t => t.CreatedAt)
             };
-            
-            var page = queryDto.Page < 1 ? 1 : queryDto.Page;
-            var pageSize = queryDto.PageSize < 1 ? 10 : queryDto.PageSize;
 
-            if (pageSize > 100) pageSize = 100;
-
-            var todos = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-
-            var items = _mapper.Map<List<TodoDto>>(todos);
-
-            return new PagedResult<TodoDto>
-            {
-                Items = items,
-                Page = page,
-                PageSize = pageSize,
-                TotalItems = totalItems,
-                TotalPages = (int)Math.Ceiling(totalItems / (double)pageSize)
-            };
+            return await query.ToPagedResultAsync<Todo, TodoDto>(queryDto.Page, queryDto.PageSize, _mapper);
         }
 
         public async Task CreateTodoAsync(CreateTodoDto dto, int userId)
@@ -121,9 +98,12 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task DeleteTodoAsync(int id, int userId)
         {
-            var todo = await _todoRepo.FindAsync(t => t.Id == id && t.UserId == userId);
+            var todo = await _todoRepo.FindAsync(t => t.Id == id);
 
             if (todo == null) throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
+
+            if (todo.UserId != userId)
+                throw new ForbiddenException("You cannot delete this todo", "TODO_FORBIDDEN");
 
             await _todoRepo.DeleteAsync(todo);
             await _unitOfWork.SaveChangesAsync();
@@ -131,9 +111,12 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task UpdateTodoAsync(int id, UpdateTodoDto dto, int userId)
         {
-            var todo = await _todoRepo.FindAsync(t => t.Id == id && t.UserId == userId);
+            var todo = await _todoRepo.FindAsync(t => t.Id == id);
 
             if (todo == null) throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
+
+            if (todo.UserId != userId)
+                throw new ForbiddenException("You cannot delete this todo", "TODO_FORBIDDEN");
 
             if (dto.CategoryId.HasValue)
             {
@@ -160,10 +143,13 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task UpdateTodoStatusAsync(int id, int userId, UpdateTodoStatusDto dto)
         {
-            var todo = await _todoRepo.FindAsync(t => t.Id == id && t.UserId == userId);
+            var todo = await _todoRepo.FindAsync(t => t.Id == id);
 
             if (todo == null)
                 throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
+
+            if (todo.UserId != userId)
+                throw new ForbiddenException("You cannot delete this todo", "TODO_FORBIDDEN");
 
             if (!IsValidStatusTransition(todo.Status, dto.Status))
                 throw new ConflictException($"Cannot change status from {todo.Status} to {dto.Status}", "INVALID_TODO_STATUS_TRANSITION");
@@ -205,10 +191,13 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task<List<TodoActivityDto>> GetActivitiesAsync(int id, int userId)
         {
-            var todo = await _todoRepo.FindAsync(t => t.Id == id && t.UserId == userId);
+            var todo = await _todoRepo.FindAsync(t => t.Id == id);
 
             if (todo == null)
                 throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
+
+            if (todo.UserId != userId)
+                throw new ForbiddenException("You cannot delete this todo", "TODO_FORBIDDEN");
 
             var activities = await _activityRepo.All()
                 .AsNoTracking()
