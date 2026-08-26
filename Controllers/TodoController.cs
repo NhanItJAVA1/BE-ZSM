@@ -33,40 +33,25 @@ public class TodoController : ControllerBase
         var todo = await _todoService.GetTodoAsync(id, userId);
         return Ok(todo);
     }
-
     [HttpPost]
-    public async Task<IActionResult> CreateTodo(CreateTodoDto dto)
+    public async Task<IActionResult> CreateTodos(List<CreateTodoDto> dtos)
     {
-        var userId = GetCurrentUserId();
-        await _todoService.CreateTodoAsync(dto, userId);
-        return Ok(new
-        {
-            message = "Todo created successfully"
-        });
+        await _todoService.CreateTodosAsync(dtos, GetCurrentUserId());
+        return Ok(new { message = "Todos created successfully" });
     }
 
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateTodo(int id, UpdateTodoDto dto)
     {
-        var userId = GetCurrentUserId();
-        await _todoService.UpdateTodoAsync(id, dto, userId);
-        return Ok(new
-        {
-            message = "Todo updated successfully"
-        });
+        await _todoService.UpdateTodoAsync(id, dto, GetCurrentUserId());
+        return Ok(new { message = "Todo updated successfully" });
     }
 
     [HttpPatch("{id:int}/status")]
     public async Task<IActionResult> UpdateStatus(int id, UpdateTodoStatusDto dto)
     {
-        var userId = GetCurrentUserId();
-
-        await _todoService.UpdateTodoStatusAsync(id, userId, dto);
-
-        return Ok(new
-        {
-            message = "Todo status updated successfully"
-        });
+        await _todoService.UpdateTodoStatusAsync(id, GetCurrentUserId(), dto);
+        return Ok(new { message = "Todo status updated successfully" });
     }
 
     [HttpDelete("{id:int}")]

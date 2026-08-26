@@ -77,13 +77,7 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task CreateTodoAsync(CreateTodoDto dto, int userId)
         {
-            if (dto.CategoryId.HasValue)
-            {
-                var category = await _categoryRepo.FindAsync(c => c.Id == dto.CategoryId && c.UserId == userId);
-
-                if (category == null)
-                    throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
-            }
+            await ValidateCategoryAsync(dto.CategoryId, userId);
 
             var todo = _mapper.Map<Todo>(dto);
             todo.UserId = userId;
@@ -93,6 +87,45 @@ namespace BE_ZSM.Services.TodoService
             await _unitOfWork.SaveChangesAsync();
 
             await AddActivityAsync(todo.Id, TodoActivityType.Created, "Todo created");
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        public async Task CreateTodosAsync(List<CreateTodoDto> dtos, int userId)
+        {
+            var categoryIds = dtos
+                .Where(x => x.CategoryId.HasValue)
+                .Select(x => x.CategoryId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (categoryIds.Count > 0)
+            {
+                var validCategoryIds = await _categoryRepo
+                    .All()
+                    .AsNoTracking()
+                    .Where(c => c.UserId == userId && categoryIds.Contains(c.Id))
+                    .Select(c => c.Id)
+                    .ToListAsync();
+
+                if (validCategoryIds.Count != categoryIds.Count)
+                    throw new NotFoundException("One or more categories not found", "CATEGORY_NOT_FOUND");
+            }
+
+            var todos = _mapper.Map<List<Todo>>(dtos);
+            var now = DateTime.UtcNow;
+
+            foreach (var todo in todos)
+            {
+                todo.UserId = userId;
+                todo.CreatedAt = now;
+            }
+
+            await _todoRepo.CreateRangeAsync(todos);
+            await _unitOfWork.SaveChangesAsync();
+
+            foreach (var todo in todos)
+                await AddActivityAsync(todo.Id, TodoActivityType.Created, "Todo created");
+
             await _unitOfWork.SaveChangesAsync();
         }
 
@@ -206,6 +239,15 @@ namespace BE_ZSM.Services.TodoService
                 .ToListAsync();
 
             return _mapper.Map<List<TodoActivityDto>>(activities);
+        }
+        private async Task ValidateCategoryAsync(int? categoryId, int userId)
+        {
+            if (!categoryId.HasValue) return;
+
+            var category = await _categoryRepo.FindAsync(c => c.Id == categoryId && c.UserId == userId);
+
+            if (category == null)
+                throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
         }
     }
 }

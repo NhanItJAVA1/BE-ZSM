@@ -85,4 +85,5 @@ public class GenericRepository<T>
 
         _dbSet.RemoveRange(entities);
     }
+
 }
