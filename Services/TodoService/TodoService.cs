@@ -158,6 +158,22 @@ namespace BE_ZSM.Services.TodoService
             await _todoRepo.DeleteAsync(todo);
             await _unitOfWork.SaveChangesAsync();
         }
+        public async Task DeleteTodosAsync(List<int> ids, int userId)
+        {
+            var distinctIds = ids.Distinct().ToList();
+
+            if (distinctIds.Count == 0) return;
+
+            var todos = await _todoRepo.All()
+                .Where(t => distinctIds.Contains(t.Id) && t.UserId == userId)
+                .ToListAsync();
+
+            if (todos.Count != distinctIds.Count)
+                throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");
+
+            await _todoRepo.DeleteRangeAsync(todos);
+            await _unitOfWork.SaveChangesAsync();
+        }
 
         public async Task UpdateTodoAsync(int id, TodoRequestDto dto, int userId)
         {

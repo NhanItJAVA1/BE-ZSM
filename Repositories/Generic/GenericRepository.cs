@@ -76,13 +76,8 @@ public class GenericRepository<T>
         await Task.CompletedTask;
     }
 
-    public async Task DeleteRangeAsync(
-        Expression<Func<T, bool>> predicate)
+    public void DeleteRangeAsync(IEnumerable<T> entities)
     {
-        var entities = await _dbSet
-            .Where(predicate)
-            .ToListAsync();
-
         _dbSet.RemoveRange(entities);
     }
 

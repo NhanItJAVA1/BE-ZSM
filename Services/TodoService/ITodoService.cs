@@ -10,6 +10,7 @@ namespace BE_ZSM.Services.TodoService
         Task CreateTodoAsync(TodoRequestDto dto,int userId);
         Task UpdateTodoAsync(int id, TodoRequestDto dto, int userId);
         Task DeleteTodoAsync(int id, int userId);
+        Task DeleteTodosAsync(List<int> ids, int userId);
         Task UpdateTodoStatusAsync(int id, int userId, UpdateTodoStatusDto dto);
         Task<List<TodoActivityDto>> GetActivitiesAsync(int id, int userId);
         Task CreateTodosAsync(List<TodoRequestDto> dtos, int userId);

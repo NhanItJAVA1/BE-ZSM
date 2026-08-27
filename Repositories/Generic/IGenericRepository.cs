@@ -16,9 +16,7 @@ namespace BE_ZSM.Repositories.Generic
 
         Task UpdateRangeAsync(IEnumerable<T> items);
         Task DeleteAsync(T item);
-
-        Task DeleteRangeAsync(
-            Expression<Func<T, bool>> predicate);
+        void DeleteRangeAsync(IEnumerable<T> entities);
 
     }
 }

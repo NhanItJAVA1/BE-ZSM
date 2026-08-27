@@ -40,6 +40,8 @@ public class TodoController : ControllerBase
         return Ok(new { message = "Todos created successfully" });
     }
 
+
+    //Bỏ API này chỉ dùng 1 CreateTodos
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateTodo(int id, TodoRequestDto dto)
     {
@@ -63,6 +65,13 @@ public class TodoController : ControllerBase
         {
             message = "Todo deleted successfully"
         });
+    }
+
+    [HttpDelete("bulk")]
+    public async Task<IActionResult> DeleteTodos(DeleteTodosDto dto)
+    {
+        await _todoService.DeleteTodosAsync(dto.Ids, GetCurrentUserId());
+        return Ok(new { message = "Todos deleted successfully" });
     }
 
     private int GetCurrentUserId()
