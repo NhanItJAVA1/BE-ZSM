@@ -28,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="BE-ZSM.Tests\**\*.cs" />
+    <Content Remove="BE-ZSM.Tests\**\*" />
+    <EmbeddedResource Remove="BE-ZSM.Tests\**\*" />
+    <None Remove="BE-ZSM.Tests\**\*" />
     <Folder Include="BE-ZSM.Tests\MapService\" />
     <Folder Include="Migrations\" />
     <Folder Include="Configurations\" />

@@ -38,15 +38,18 @@ public partial class Program
         });
 
 
-        var connectionString =
-            builder.Configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException(
-                "ConnectionStrings:DefaultConnection is missing."
-            );
+        if (!builder.Environment.IsEnvironment("Testing"))
+        {
+            var connectionString =
+                builder.Configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException(
+                    "ConnectionStrings:DefaultConnection is missing."
+                );
 
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(connectionString)
-        );
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlServer(connectionString)
+            );
+        }
 
         var jwtIssuer = GetRequiredEnvironmentVariable("JWT_ISSUER");
         var jwtAudience = GetRequiredEnvironmentVariable("JWT_AUDIENCE");
