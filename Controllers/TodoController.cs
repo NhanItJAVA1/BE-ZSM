@@ -34,14 +34,14 @@ public class TodoController : ControllerBase
         return Ok(todo);
     }
     [HttpPost]
-    public async Task<IActionResult> CreateTodos(List<CreateTodoDto> dtos)
+    public async Task<IActionResult> CreateTodos(List<TodoRequestDto> dtos)
     {
         await _todoService.CreateTodosAsync(dtos, GetCurrentUserId());
         return Ok(new { message = "Todos created successfully" });
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> UpdateTodo(int id, UpdateTodoDto dto)
+    public async Task<IActionResult> UpdateTodo(int id, TodoRequestDto dto)
     {
         await _todoService.UpdateTodoAsync(id, dto, GetCurrentUserId());
         return Ok(new { message = "Todo updated successfully" });

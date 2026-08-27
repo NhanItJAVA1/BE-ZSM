@@ -75,13 +75,15 @@ namespace BE_ZSM.Services.TodoService
             return await query.ToPagedResultAsync<Todo, TodoDto>(queryDto.Page, queryDto.PageSize, _mapper);
         }
 
-        public async Task CreateTodoAsync(CreateTodoDto dto, int userId)
+        // Dự định xóa CreateTodoAsync
+        public async Task CreateTodoAsync(TodoRequestDto dto, int userId)
         {
             await ValidateCategoryAsync(dto.CategoryId, userId);
 
             var todo = _mapper.Map<Todo>(dto);
             todo.UserId = userId;
             todo.CreatedAt = DateTime.UtcNow;
+            todo.Priority = dto.Priority ?? TodoPriority.Medium;
 
             await _todoRepo.CreateAsync(todo);
             await _unitOfWork.SaveChangesAsync();
@@ -90,7 +92,7 @@ namespace BE_ZSM.Services.TodoService
             await _unitOfWork.SaveChangesAsync();
         }
 
-        public async Task CreateTodosAsync(List<CreateTodoDto> dtos, int userId)
+        public async Task CreateTodosAsync(List<TodoRequestDto> dtos, int userId)
         {
             var categoryIds = dtos
                 .Where(x => x.CategoryId.HasValue)
@@ -114,15 +116,30 @@ namespace BE_ZSM.Services.TodoService
             var todos = _mapper.Map<List<Todo>>(dtos);
             var now = DateTime.UtcNow;
 
-            foreach (var todo in todos)
+            for (var i = 0; i < todos.Count; i++)
             {
-                todo.UserId = userId;
-                todo.CreatedAt = now;
+                todos[i].UserId = userId;
+                todos[i].CreatedAt = now;
+                todos[i].Priority = dtos[i].Priority ?? TodoPriority.Medium;
             }
 
-            await _todoRepo.CreateRangeAsync(todos);
-            await _unitOfWork.SaveChangesAsync();
 
+            //await _todoRepo.CreateRangeAsync(todos);
+            //await _unitOfWork.SaveChangesAsync();
+
+            //var activities = todos.Select(todo => new TodoActivity
+            //{
+            //    TodoId = todo.Id,
+            //    Type = TodoActivityType.Created,
+            //    Description = "Todo created",
+            //    CreatedAt = now
+            //}).ToList();
+
+            //await _activityRepo.CreateRangeAsync(activities);
+            //await _unitOfWork.SaveChangesAsync();
+
+
+            await _todoRepo.CreateRangeAsync(todos);
             foreach (var todo in todos)
                 await AddActivityAsync(todo.Id, TodoActivityType.Created, "Todo created");
 
@@ -140,29 +157,28 @@ namespace BE_ZSM.Services.TodoService
 
             await _todoRepo.DeleteAsync(todo);
             await _unitOfWork.SaveChangesAsync();
-        }        
+        }
 
-        public async Task UpdateTodoAsync(int id, UpdateTodoDto dto, int userId)
+        public async Task UpdateTodoAsync(int id, TodoRequestDto dto, int userId)
         {
             var todo = await _todoRepo.FindAsync(t => t.Id == id);
 
-            if (todo == null) throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
+            if (todo == null)
+                throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
 
             if (todo.UserId != userId)
-                throw new ForbiddenException("You cannot delete this todo", "TODO_FORBIDDEN");
+                throw new ForbiddenException("You cannot update this todo", "TODO_FORBIDDEN");
 
-            if (dto.CategoryId.HasValue)
-            {
-                var category = await _categoryRepo.FindAsync(c => c.Id == dto.CategoryId && c.UserId == userId);
+            if (!dto.Priority.HasValue)
+                throw new ConflictException("Priority is required", "PRIORITY_REQUIRED");
 
-                if (category == null)
-                    throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
-            }
+            await ValidateCategoryAsync(dto.CategoryId, userId);
 
             var oldPriority = todo.Priority;
             var oldCategoryId = todo.CategoryId;
 
             _mapper.Map(dto, todo);
+            todo.Priority = dto.Priority.Value;
             todo.UpdatedAt = DateTime.UtcNow;
 
             if (oldPriority != todo.Priority)
