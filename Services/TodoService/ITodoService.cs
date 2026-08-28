@@ -6,8 +6,8 @@ namespace BE_ZSM.Services.TodoService
     public interface ITodoService
     {
         Task<PagedResult<TodoDto>> GetTodosAsync(int userId, TodoQueryDto queryDto);
-        Task DeleteTodosAsync(List<int> ids, int userId);
         Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId);
+        //Task DeleteTodosAsync(List<int> ids, int userId);
         //Task UpdateTodoStatusAsync(int id, int userId, UpdateTodoStatusDto dto);
         //Task<List<TodoActivityDto>> GetActivitiesAsync(int id, int userId);
         //Task CreateTodosAsync(List<TodoRequestDto> dtos, int userId);

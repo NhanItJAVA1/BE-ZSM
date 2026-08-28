@@ -52,31 +52,31 @@ public class MappingProfile : Profile
            .ForMember(dest => dest.IsOverdue, opt => opt.MapFrom(src => src.DueDate.HasValue && src.DueDate.Value < DateTime.UtcNow && src.Status != TodoStatus.Done))
            .ForMember(dest => dest.IsCompletedLate, opt => opt.MapFrom(src => src.CompletedAt.HasValue && src.DueDate.HasValue && src.CompletedAt.Value > src.DueDate.Value));
 
-        CreateMap<TodoRequestDto, Todo>()
-            .ForMember(dest => dest.Id,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UserId,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.User,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.Status,
-                opt => opt.MapFrom(_ => TodoStatus.Todo))
-            .ForMember(dest => dest.CreatedAt,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt,
-                opt => opt.Ignore());
+        //CreateMap<TodoRequestDto, Todo>()
+        //    .ForMember(dest => dest.Id,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.UserId,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.User,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.Status,
+        //        opt => opt.MapFrom(_ => TodoStatus.Todo))
+        //    .ForMember(dest => dest.CreatedAt,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.UpdatedAt,
+        //        opt => opt.Ignore());
 
-        CreateMap<TodoRequestDto, Todo>()
-            .ForMember(dest => dest.Id,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UserId,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.User,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.CreatedAt,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt,
-                opt => opt.MapFrom(_ => DateTime.UtcNow));
+        //CreateMap<TodoRequestDto, Todo>()
+        //    .ForMember(dest => dest.Id,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.UserId,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.User,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.CreatedAt,
+        //        opt => opt.Ignore())
+        //    .ForMember(dest => dest.UpdatedAt,
+        //        opt => opt.MapFrom(_ => DateTime.UtcNow));
 
         CreateMap<SaveTodoDto, Todo>()
             .ForMember(dest => dest.Id,

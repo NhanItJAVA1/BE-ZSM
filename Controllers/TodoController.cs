@@ -33,13 +33,6 @@ public class TodoController : ControllerBase
         return Ok(new { message = "Todos saved successfully" });
     }
 
-    [HttpDelete("bulk")]
-    public async Task<IActionResult> DeleteTodos(DeleteTodosDto dto)
-    {
-        await _todoService.DeleteTodosAsync(dto.Ids, GetCurrentUserId());
-        return Ok(new { message = "Todos deleted successfully" });
-    }
-
     private int GetCurrentUserId()
     {
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
@@ -50,6 +43,14 @@ public class TodoController : ControllerBase
 
         return int.Parse(userIdClaim.Value);
     }
+
+
+    //[HttpDelete("bulk")]
+    //public async Task<IActionResult> DeleteTodos(DeleteTodosDto dto)
+    //{
+    //    await _todoService.DeleteTodosAsync(dto.Ids, GetCurrentUserId());
+    //    return Ok(new { message = "Todos deleted successfully" });
+    //}ss
 
     //[HttpGet("{id:int}")]
     //public async Task<IActionResult> GetTodo(int id)

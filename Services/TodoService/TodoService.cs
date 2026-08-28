@@ -78,22 +78,22 @@ namespace BE_ZSM.Services.TodoService
         }
 
         // DELETE TODOS
-        public async Task DeleteTodosAsync(List<int> ids, int userId)
-        {
-            var distinctIds = ids.Distinct().ToList();
+        //public async Task DeleteTodosAsync(List<int> ids, int userId)
+        //{
+        //    var distinctIds = ids.Distinct().ToList();
 
-            if (distinctIds.Count == 0) return;
+        //    if (distinctIds.Count == 0) return;
 
-            var todos = await _todoRepo.All()
-                .Where(t => distinctIds.Contains(t.Id) && t.UserId == userId)
-                .ToListAsync();
+        //    var todos = await _todoRepo.All()
+        //        .Where(t => distinctIds.Contains(t.Id) && t.UserId == userId)
+        //        .ToListAsync();
 
-            if (todos.Count != distinctIds.Count)
-                throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");
+        //    if (todos.Count != distinctIds.Count)
+        //        throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");
 
-            _todoRepo.DeleteRangeAsync(todos);
-            await _unitOfWork.SaveChangesAsync();
-        }
+        //    _todoRepo.DeleteRangeAsync(todos);
+        //    await _unitOfWork.SaveChangesAsync();
+        //}
 
         // SAVE TODOS (CREATE, UPDATE, DELETE)
         public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)
