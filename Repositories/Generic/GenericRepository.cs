@@ -80,5 +80,10 @@ public class GenericRepository<T>
     {
         _dbSet.RemoveRange(entities);
     }
-
+    public void SetOriginalValue<TProperty>(T entity, Expression<Func<T, TProperty>> property, TProperty value)
+    {
+        _context.Entry(entity)
+            .Property(property)
+            .OriginalValue = value;
+    }
 }

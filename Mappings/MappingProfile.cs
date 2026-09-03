@@ -79,24 +79,16 @@ public class MappingProfile : Profile
         //        opt => opt.MapFrom(_ => DateTime.UtcNow));
 
         CreateMap<SaveTodoDto, Todo>()
-            .ForMember(dest => dest.Id,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UserId,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.User,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.Status,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.CreatedAt,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.CompletedAt,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.Category,
-                opt => opt.Ignore())
-            .ForMember(dest => dest.Activities,
-                opt => opt.Ignore());
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.RowVersion, opt => opt.Ignore())            
+            .ForMember(dest => dest.UserId, opt => opt.Ignore())
+            .ForMember(dest => dest.User, opt => opt.Ignore())
+            .ForMember(dest => dest.Status, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.CompletedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.Category, opt => opt.Ignore())
+            .ForMember(dest => dest.Activities, opt => opt.Ignore());
 
         CreateMap<TodoCategory, TodoCategoryDto>();
 

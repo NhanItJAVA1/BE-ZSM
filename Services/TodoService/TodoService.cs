@@ -47,7 +47,6 @@ namespace BE_ZSM.Services.TodoService
             if (!string.IsNullOrWhiteSpace(queryDto.Search))
             {
                 var search = queryDto.Search.Trim();
-
                 query = query.Where(t =>
                     t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
             }
@@ -95,7 +94,7 @@ namespace BE_ZSM.Services.TodoService
         //    await _unitOfWork.SaveChangesAsync();
         //}
 
-        // SAVE TODOS (CREATE, UPDATE, DELETE)
+        // ========== SAVE TODOS (CREATE, UPDATE, DELETE) ==========
         public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)
         {
             if (dtos.Count == 0) return;
@@ -122,8 +121,7 @@ namespace BE_ZSM.Services.TodoService
                 .Distinct()
                 .ToList();
 
-            var existingTodos = await _todoRepo.All()
-                .Where(t => t.UserId == userId && ids.Contains(t.Id))
+            var existingTodos = await _todoRepo.Where(t => t.UserId == userId && ids.Contains(t.Id))
                 .ToListAsync();
 
             if (existingTodos.Count != ids.Count)
@@ -160,6 +158,13 @@ namespace BE_ZSM.Services.TodoService
                 }
 
                 var existing = todoMap[dto.Id.Value];
+
+                if (dto.RowVersion == null)
+                    throw new ConflictException("RowVersion is required", "ROW_VERSION_REQUIRED");
+                _todoRepo.SetOriginalValue(
+                    existing,
+                    t => t.RowVersion,
+                    dto.RowVersion);
 
                 if (dto.IsDeleted)
                 {
@@ -202,8 +207,18 @@ namespace BE_ZSM.Services.TodoService
             if (activities.Count > 0)
                 await _activityRepo.CreateRangeAsync(activities);
 
-            await _unitOfWork.SaveChangesAsync();
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new ConflictException(
+                    "One or more todos were modified or deleted by another request",
+                    "TODO_CONCURRENCY_CONFLICT");
+            }
         }
+
         //public async Task CreateTodoAsync(TodoRequestDto dto, int userId)
         //{
         //    await ValidateCategoryAsync(dto.CategoryId, userId);

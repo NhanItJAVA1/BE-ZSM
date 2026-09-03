@@ -37,7 +37,25 @@ public class UsersController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginUserDto dto)
     {
-        return Ok(await _userService.LoginAsync(dto));
+        var result = await _userService.LoginAsync(dto);
+
+        Response.Cookies.Append(
+            "refreshToken",
+            result.RefreshToken,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            }
+        );
+
+        return Ok(new
+        {
+            result.AccessToken,
+            result.User
+        });
     }
 
     [HttpPut("{id}")]

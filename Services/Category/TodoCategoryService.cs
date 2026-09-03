@@ -56,10 +56,13 @@ namespace BE_ZSM.Services.Category
 
         public async Task UpdateCategoryAsync(int id, UpdateTodoCategoryDto dto, int userId)
         {
-            var category = await _categoryRepo.FindAsync(c => c.Id == id && c.UserId == userId);
+            var category = await _categoryRepo.FindAsync(c => c.Id == id);
 
             if (category == null)
                 throw new NotFoundException("Category not found", "CATEGORY_NOT_FOUND");
+
+            if (category.UserId != userId)
+                throw new ForbiddenException("", "");
 
             _mapper.Map(dto, category);
             await _unitOfWork.SaveChangesAsync();

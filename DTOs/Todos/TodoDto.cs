@@ -24,5 +24,7 @@ namespace BE_ZSM.DTOs.Todos
         public bool IsCompletedLate { get; set; }
         public int? CategoryId { get; set; }
         public string? CategoryName { get; set; }
+
+        public byte[] RowVersion { get; set; } = [];
     }
 }

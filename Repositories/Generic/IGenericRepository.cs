@@ -18,5 +18,7 @@ namespace BE_ZSM.Repositories.Generic
         Task DeleteAsync(T item);
         void DeleteRangeAsync(IEnumerable<T> entities);
 
+        void SetOriginalValue<TProperty>(T entity, Expression<Func<T, TProperty>> property, TProperty value);
+
     }
 }
