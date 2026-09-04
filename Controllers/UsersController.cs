@@ -1,5 +1,6 @@
 ﻿using BE_ZSM.DTOs.RefreshToken;
 using BE_ZSM.DTOs.Users;
+using BE_ZSM.Exceptions;
 using BE_ZSM.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -75,8 +76,15 @@ public class UsersController : ControllerBase
     }
 
     [HttpPost("refresh-token")]
-    public async Task<IActionResult> RefreshToken(RefreshTokenDto dto)
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto? dto)
     {
-        return Ok(await _userService.RefreshTokenAsync(dto.RefreshToken));
+        var refreshToken = Request.Cookies["refreshToken"] ?? dto?.RefreshToken;
+
+        if (string.IsNullOrWhiteSpace(refreshToken))
+            throw new UnauthorizedException("Missing refresh token", "Refresh token is required");
+
+        var result = await _userService.RefreshTokenAsync(refreshToken);
+
+        return Ok(result);
     }
 }
