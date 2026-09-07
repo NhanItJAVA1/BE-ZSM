@@ -8,7 +8,7 @@
 
         public string Email { get; set; } = string.Empty;
 
-        public string PasswordHash { get; set; } = string.Empty;
+        public string? PasswordHash { get; set; } = string.Empty;
 
         public string DisplayName { get; set; } = string.Empty;
 
@@ -26,5 +26,6 @@
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public ICollection<Todo> Todos { get; set; } = [];
         public ICollection<TodoCategory> TodoCategories { get; set; } = [];
+        public ICollection<ExternalLogin> ExternalLogins { get; set; } = [];
     }
 }

@@ -11,13 +11,15 @@ obj/
 .env
 .env.*
 !.env.example
-.md
 
 # Local configuration
 appsettings.Development.json
 
 # Logs
 *.log
+
+# Local history
+HISTORY.md
 
 # backups
 ZSM.bak

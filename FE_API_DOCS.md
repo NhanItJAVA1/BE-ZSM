@@ -140,7 +140,7 @@ Rules:
 
 Method: `POST`
 
-Route: `/api/users/register`
+Route: `/api/auth/register`
 
 Authorization: none
 
@@ -179,7 +179,7 @@ Business rules:
 
 Method: `POST`
 
-Route: `/api/users/login`
+Route: `/api/auth/login`
 
 Authorization: none
 
@@ -199,7 +199,6 @@ Response body:
 ```json
 {
   "accessToken": "<jwt>",
-  "refreshToken": "<refresh-token>",
   "user": {
     "id": 1,
     "username": "alice",
@@ -222,20 +221,22 @@ Business rules:
 
 - Login uses `username` and `password`.
 - Invalid username and invalid password return the same error.
-- A successful login creates a refresh token that expires after 7 days.
+- A successful login creates a refresh token that expires after 7 days and stores it in the `refreshToken` HttpOnly cookie.
 - JWT includes user id, username, email, and role claims.
 
 ### Refresh Token
 
 Method: `POST`
 
-Route: `/api/users/refresh-token`
+Route: `/api/auth/refresh-token`
 
 Authorization: none
 
 Path/query parameters: none
 
 Request body:
+
+If the `refreshToken` HttpOnly cookie exists, the request body can be omitted. Use the body only as a fallback for clients that cannot send cookies.
 
 ```json
 {
@@ -273,6 +274,59 @@ Business rules:
 - Refresh token must not be revoked.
 - Refresh token `expiresAt` must be greater than or equal to current UTC time.
 - The existing refresh token is returned; the service does not rotate it.
+- This endpoint uses the same ZSM refresh token for local login and Google external login.
+
+### Google External Login
+
+Method: `POST`
+
+Route: `/api/auth/external-login`
+
+Authorization: none
+
+Path/query parameters: none
+
+Request body:
+
+```json
+{
+  "provider": "Google",
+  "token": "<google-id-token-or-access-token>"
+}
+```
+
+Response body:
+
+```json
+{
+  "accessToken": "<jwt>",
+  "user": {
+    "id": 1,
+    "username": "alice@example.com",
+    "email": "alice@example.com",
+    "displayName": "Alice",
+    "avatarUrl": "https://example.com/avatar.png",
+    "role": "User",
+    "createdAt": "2026-08-24T00:00:00Z",
+    "updatedAt": "2026-08-24T00:00:00Z"
+  }
+}
+```
+
+Possible error codes:
+
+- `401 Unauthorized`, `INVALID_GOOGLE_TOKEN`
+- `401 Unauthorized`, `GOOGLE_EMAIL_NOT_VERIFIED`
+- `400 Bad Request`, `UNSUPPORTED_AUTH_PROVIDER`
+
+Business rules:
+
+- `token` can be the Google Sign-In `credential` ID token or a Google OAuth `access_token`.
+- Google tokens are validated against the backend `GOOGLE_CLIENT_ID`.
+- Google token is used only to verify identity at login time; ZSM creates and owns the session after that.
+- If the Google account email already exists, the external login is linked to that user.
+- If the email does not exist, a new user is created with the default `User` role.
+- A successful external login creates a refresh token that expires after 7 days and stores it in the `refreshToken` HttpOnly cookie.
 
 ## Todo Endpoints
 

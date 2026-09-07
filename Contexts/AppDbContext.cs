@@ -16,6 +16,7 @@ namespace BE_ZSM.Contexts
         public DbSet<Todo> Todos { get; set; }
         public DbSet<TodoCategory> TodoCategories { get; set; }
         public DbSet<TodoActivity> TodoActivities { get; set; }
+        public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
@@ -106,6 +107,29 @@ namespace BE_ZSM.Contexts
 
                 entity.Property(a => a.CreatedAt)
                     .IsRequired();
+            });
+
+            modelBuilder.Entity<ExternalLogin>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+
+                entity.Property(x => x.ProviderUserId)
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(x => x.Email)
+                    .HasMaxLength(255);
+
+                entity.HasIndex(x => new
+                {
+                    x.Provider,
+                    x.ProviderUserId
+                }).IsUnique();
+
+                entity.HasOne(x => x.User)
+                    .WithMany(x => x.ExternalLogins)
+                    .HasForeignKey(x => x.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
         }

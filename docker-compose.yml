@@ -35,6 +35,7 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE}
       JWT_KEY: ${JWT_KEY}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
 
     depends_on:
       - sqlserver

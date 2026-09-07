@@ -118,7 +118,7 @@ Authorization: Bearer <jwt_token>
 
 ### Login
 ```
-POST /api/users/login
+POST /api/auth/login
 Content-Type: application/json
 ```
 
@@ -133,12 +133,23 @@ Content-Type: application/json
 **Response (200 OK):**
 ```json
 {
-  "id": 1,
-  "username": "player1",
-  "email": "player1@example.com",
-  "token": "eyJhbGciOiJIUzI1NiIs..."
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": 1,
+    "username": "player1",
+    "email": "player1@example.com",
+    "displayName": "Player 1",
+    "avatarUrl": null,
+    "role": "User",
+    "createdAt": "2026-08-24T00:00:00Z",
+    "updatedAt": "2026-08-24T00:00:00Z"
+  }
 }
 ```
+
+**Notes:**
+- A successful login creates a ZSM refresh token and stores it in the `refreshToken` HttpOnly cookie.
+- The response body intentionally does not expose the refresh token.
 
 **Error (401):**
 ```json
@@ -149,7 +160,7 @@ Content-Type: application/json
 
 ### Register
 ```
-POST /api/users/register
+POST /api/auth/register
 Content-Type: application/json
 ```
 
@@ -162,15 +173,91 @@ Content-Type: application/json
 }
 ```
 
-**Response (201 Created):**
+**Response (200 OK):** empty body.
+
+### Refresh Token
+```
+POST /api/auth/refresh-token
+Content-Type: application/json
+```
+
+**Request:**
+
+If the `refreshToken` HttpOnly cookie exists, the body can be omitted. Use this body only as a fallback.
+
 ```json
 {
-  "id": 2,
-  "username": "newplayer",
-  "email": "newplayer@example.com",
-  "token": "eyJhbGciOiJIUzI1NiIs..."
+  "refreshToken": "<refresh-token>"
 }
 ```
+
+**Response (200 OK):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "<same-refresh-token>",
+  "user": {
+    "id": 1,
+    "username": "player1",
+    "email": "player1@example.com",
+    "displayName": "Player 1",
+    "avatarUrl": null,
+    "role": "User",
+    "createdAt": "2026-08-24T00:00:00Z",
+    "updatedAt": "2026-08-24T00:00:00Z"
+  }
+}
+```
+
+**Notes:**
+- The same refresh endpoint works for users who logged in with username/password or Google.
+- The service returns the existing refresh token; it does not rotate it.
+
+**Error (401):**
+```json
+{
+  "errorCode": "INVALID_REFRESH_TOKEN",
+  "message": "Invalid or expired refresh token"
+}
+```
+
+### Google External Login
+```
+POST /api/auth/external-login
+Content-Type: application/json
+```
+
+**Request:**
+```json
+{
+  "provider": "Google",
+  "token": "<google-id-token-or-access-token>"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "user": {
+    "id": 1,
+    "username": "player1@example.com",
+    "email": "player1@example.com",
+    "displayName": "Player 1",
+    "avatarUrl": "https://example.com/avatar.png",
+    "role": "User",
+    "createdAt": "2026-08-24T00:00:00Z",
+    "updatedAt": "2026-08-24T00:00:00Z"
+  }
+}
+```
+
+**Notes:**
+- Google token is used only to verify identity at login time.
+- After Google verification succeeds, ZSM creates the same access token and refresh token session used by local login.
+- The refresh token is stored in the `refreshToken` HttpOnly cookie.
+- The response body intentionally does not expose the refresh token.
+- `/api/auth/refresh-token` works the same for local login and Google login.
 
 ---
 
@@ -391,15 +478,15 @@ All error responses follow this format:
 ### 1. Login and Get Token
 ```javascript
 async function login(username, password) {
-  const response = await fetch('https://localhost:7046/api/users/login', {
+  const response = await fetch('https://localhost:7046/api/auth/login', {
 	method: 'POST',
 	headers: { 'Content-Type': 'application/json' },
 	body: JSON.stringify({ username, password })
   });
 
   const data = await response.json();
-  localStorage.setItem('token', data.token);
-  return data.token;
+  localStorage.setItem('token', data.accessToken);
+  return data.accessToken;
 }
 ```
 
