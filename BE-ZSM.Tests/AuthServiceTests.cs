@@ -136,6 +136,43 @@ public sealed class AuthServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Logout_LocalLogin_ShouldRevokeRefreshToken()
+    {
+        await SeedLocalUserAsync();
+        var login = await LoginLocalUserAsync();
+
+        await _service.LogoutAsync(login.RefreshToken);
+
+        var refreshToken = await _db.RefreshTokens.SingleAsync();
+        Assert.NotNull(refreshToken.RevokeAt);
+
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(
+            () => _service.RefreshTokenAsync(login.RefreshToken));
+
+        Assert.Equal("INVALID_REFRESH_TOKEN", exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Logout_GoogleLogin_ShouldRevokeRefreshToken()
+    {
+        var login = await _service.ExternalLoginAsync(new ExternalLoginDto
+        {
+            Provider = AuthProvider.Google,
+            Token = "google-id-token"
+        });
+
+        await _service.LogoutAsync(login.RefreshToken);
+
+        var refreshToken = await _db.RefreshTokens.SingleAsync();
+        Assert.NotNull(refreshToken.RevokeAt);
+
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(
+            () => _service.RefreshTokenAsync(login.RefreshToken));
+
+        Assert.Equal("INVALID_REFRESH_TOKEN", exception.ErrorCode);
+    }
+
+    [Fact]
     public async Task GoogleLogin_MultipleTimes_ShouldNotCreateDuplicateUserOrExternalLogin()
     {
         await _service.ExternalLoginAsync(new ExternalLoginDto

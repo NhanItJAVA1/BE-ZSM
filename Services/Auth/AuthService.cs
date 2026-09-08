@@ -97,6 +97,19 @@ public class AuthService : IAuthService
         };
     }
 
+    public async Task LogoutAsync(string token)
+    {
+        var refreshToken = await _refreshTokenRepo
+            .Where(rt => rt.Token == token)
+            .FirstOrDefaultAsync();
+
+        if (!IsRefreshTokenActive(refreshToken))
+            throw new UnauthorizedException("Invalid or expired refresh token", "INVALID_REFRESH_TOKEN");
+
+        refreshToken!.RevokeAt = DateTime.UtcNow;
+        await _unitOfWork.SaveChangesAsync();
+    }
+
     private IExternalAuthProvider GetProvider(ExternalLoginDto dto)
     {
         var provider = _providers.FirstOrDefault(x => x.Provider == dto.Provider);

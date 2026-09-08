@@ -64,6 +64,24 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenDto? dto)
+    {
+        var refreshToken = Request.Cookies["refreshToken"] ?? dto?.RefreshToken;
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(refreshToken))
+                await _authService.LogoutAsync(refreshToken);
+        }
+        finally
+        {
+            DeleteRefreshTokenCookie();
+        }
+
+        return Ok();
+    }
+
     private void AppendRefreshTokenCookie(string refreshToken)
     {
         Response.Cookies.Append("refreshToken", refreshToken, new CookieOptions
@@ -71,7 +89,19 @@ public class AuthController : ControllerBase
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
+            Path = "/",
             Expires = DateTimeOffset.UtcNow.AddDays(7)
+        });
+    }
+
+    private void DeleteRefreshTokenCookie()
+    {
+        Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
         });
     }
 }
