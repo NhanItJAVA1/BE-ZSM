@@ -99,11 +99,7 @@ namespace BE_ZSM.Services.TodoService
                     categoryIds.Contains(category.Id));
 
             if (validCategoryCount != categoryIds.Count)
-            {
-                throw new NotFoundException(
-                    "One or more categories not found",
-                    "CATEGORY_NOT_FOUND");
-            }
+                throw new NotFoundException("One or more categories not found", "CATEGORY_NOT_FOUND");
         }
 
         private async Task<Dictionary<int, Todo>> GetExistingTodosAsync(List<SaveTodoDto> dtos, int userId)
@@ -128,12 +124,13 @@ namespace BE_ZSM.Services.TodoService
 
         private TodoSaveContext ProcessTodos(List<SaveTodoDto> dtos, Dictionary<int, Todo> todoMap, int userId)
         {
+            // context => List<Todo> NewTodos | List<Todo> DeletedTodos | List<TodoActivity> Activities 
             var context = new TodoSaveContext();
             var now = DateTime.UtcNow;
 
             foreach (var dto in dtos)
             {
-                if (!dto.Id.HasValue)
+                if (!dto.Id.HasValue) // Id = null
                 {
                     ProcessCreate(dto, userId, now, context);
                     continue;
@@ -178,11 +175,7 @@ namespace BE_ZSM.Services.TodoService
         private void SetConcurrencyVersion(SaveTodoDto dto,  Todo existingTodo)
         {
             if (dto.RowVersion == null)
-            {
-                throw new ConflictException(
-                    "RowVersion is required",
-                    "ROW_VERSION_REQUIRED");
-            }
+                throw new ConflictException("RowVersion is required", "ROW_VERSION_REQUIRED");
 
             _todoRepo.SetOriginalValue(
                 existingTodo,
@@ -201,17 +194,9 @@ namespace BE_ZSM.Services.TodoService
             var oldCategoryId = existingTodo.CategoryId;
 
             _mapper.Map(dto, existingTodo);
-
-            existingTodo.Priority = dto.Priority ?? oldPriority;
-
             existingTodo.UpdatedAt = now;
 
-            AddUpdateActivities(
-                existingTodo,
-                oldPriority,
-                oldCategoryId,
-                now,
-                context);
+            AddUpdateActivities(existingTodo, oldPriority, oldCategoryId, now, context);
         }
 
         private static void AddUpdateActivities(Todo todo, TodoPriority oldPriority, int? oldCategoryId, DateTime now, TodoSaveContext context)
@@ -222,8 +207,7 @@ namespace BE_ZSM.Services.TodoService
                 {
                     TodoId = todo.Id,
                     Type = TodoActivityType.Updated,
-                    Description =
-                        $"Priority changed from {oldPriority} to {todo.Priority}",
+                    Description = $"Priority changed from {oldPriority} to {todo.Priority}",
                     CreatedAt = now
                 });
             }
