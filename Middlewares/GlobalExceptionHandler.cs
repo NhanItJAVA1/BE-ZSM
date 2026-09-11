@@ -1,6 +1,7 @@
 ﻿using Amazon.Runtime.Endpoints;
-using Smart_Financial_Management_SFM_BE.Exceptions;
+using BE_ZSM.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 
 namespace Smart_Financial_Management_SFM_BE.Middlewares
 {
@@ -18,13 +19,23 @@ namespace Smart_Financial_Management_SFM_BE.Middlewares
 
             var statusCode = exception switch
             {
-              AppException appException => appException.StatusCode, _ => StatusCodes.Status500InternalServerError
+                AppException appException => appException.StatusCode,
+                DbUpdateConcurrencyException => StatusCodes.Status409Conflict,
+                _ => StatusCodes.Status500InternalServerError
             };
 
             var errorCode = exception switch
             {
                 AppException appException => appException.ErrorCode,
+                DbUpdateConcurrencyException => "TODO_CONCURRENCY_CONFLICT",
                 _ => "INTERNAL_SERVER_ERROR"
+            };
+
+            var message = exception switch
+            {
+                AppException => exception.Message,
+                DbUpdateConcurrencyException => "One or more todos were modified or deleted by another request",
+                _ => "An unexpected error occurred."
             };
 
             var response = new
@@ -32,8 +43,7 @@ namespace Smart_Financial_Management_SFM_BE.Middlewares
                 success = false,
                 statusCode,
                 errorCode,
-            
-                message = exception is AppException ? exception.Message : "An unexpected error occurred.", 
+                message,
                 timestamp = DateTime.UtcNow,
                 path = httpContext.Request.Path.ToString(),
             };
