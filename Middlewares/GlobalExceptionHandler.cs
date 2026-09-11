@@ -1,8 +1,8 @@
 ﻿using Amazon.Runtime.Endpoints;
-using BE_ZSM.Exceptions;
+using Smart_Financial_Management_SFM_BE.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 
-namespace BE_ZSM.Middlewares
+namespace Smart_Financial_Management_SFM_BE.Middlewares
 {
     public class GlobalExceptionHandler : IExceptionHandler
     {

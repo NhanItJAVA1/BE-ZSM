@@ -1,9 +1,9 @@
-using BE_ZSM.Contexts;
-using BE_ZSM.Exceptions;
+using Smart_Financial_Management_SFM_BE.Contexts;
+using Smart_Financial_Management_SFM_BE.Exceptions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
-namespace BE_ZSM.Helpers;
+namespace Smart_Financial_Management_SFM_BE.Helpers;
 
 public class DbSaveHelper
 {

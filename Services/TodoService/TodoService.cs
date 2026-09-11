@@ -67,192 +67,46 @@ namespace BE_ZSM.Services.TodoService
             return await query.ToPagedResultAsync<Todo, TodoDto>(queryDto.Page, queryDto.PageSize, _mapper);
         }
 
-        // SAVE TODOS (CREATE, UPDATE, DELETE)
+        // SAVE BATCH OF TODOS (CREATE, UPDATE, DELETE)
         public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)
         {
-            if (dtos.Count == 0) return;
-
-            await ValidateCategoriesAsync(dtos, userId);
-
-            var todoMap = await GetExistingTodosAsync(dtos, userId);
-
-            var context = ProcessTodos(dtos, todoMap, userId);
-
-            await PersistChangesAsync(context);
-        }
-
-        private async Task ValidateCategoriesAsync(List<SaveTodoDto> dtos, int userId)
-        {
-            var categoryIds = dtos
-                .Where(x => !x.IsDeleted && x.CategoryId.HasValue)
-                .Select(x => x.CategoryId!.Value)
-                .Distinct()
-                .ToList();
-
-            if (categoryIds.Count == 0)
-                return;
-
-            var validCategoryCount = await _categoryRepo.All()
-                .AsNoTracking()
-                .CountAsync(category =>
-                    category.UserId == userId &&
-                    categoryIds.Contains(category.Id));
-
-            if (validCategoryCount != categoryIds.Count)
-                throw new NotFoundException("One or more categories not found", "CATEGORY_NOT_FOUND");
-        }
-
-        private async Task<Dictionary<int, Todo>> GetExistingTodosAsync(List<SaveTodoDto> dtos, int userId)
-        {
-            var todoIds = dtos
-                .Where(x => x.Id.HasValue)
-                .Select(x => x.Id!.Value)
-                .Distinct()
-                .ToList();
-
-            if (todoIds.Count == 0) return new Dictionary<int, Todo>();
-
-            var existingTodos = await _todoRepo
-                .Where(todo => todo.UserId == userId && todoIds.Contains(todo.Id))
-                .ToListAsync();
-
-            if (existingTodos.Count != todoIds.Count)            
-                throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");           
-
-            return existingTodos.ToDictionary(x => x.Id);
-        }
-
-        private TodoSaveContext ProcessTodos(List<SaveTodoDto> dtos, Dictionary<int, Todo> todoMap, int userId)
-        {
-            // context => List<Todo> NewTodos | List<Todo> DeletedTodos | List<TodoActivity> Activities 
-            var context = new TodoSaveContext();
-            var now = DateTime.UtcNow;
+            var todoIds = dtos.Where(x => x.Id.HasValue).Select(x => x.Id!.Value).ToList();
+            var todos = await _todoRepo.Where(x => x.UserId == userId && todoIds.Contains(x.Id)).ToListAsync();
 
             foreach (var dto in dtos)
+                await ProcessTodoAsync(dto, todos, userId);
+
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        private async Task ProcessTodoAsync(SaveTodoDto dto, List<Todo> todos, int userId)
+        {
+            if (!dto.Id.HasValue)
             {
-                if (!dto.Id.HasValue) // Id = null
-                {
-                    ProcessCreate(dto, userId, now, context);
-                    continue;
-                }
+                var newTodo = _mapper.Map<Todo>(dto);
+                newTodo.UserId = userId;
+                newTodo.CreatedAt = DateTime.UtcNow;
 
-                var existingTodo = todoMap[dto.Id.Value];
-                SetConcurrencyVersion(dto, existingTodo);
-
-                if (dto.IsDeleted)
-                {
-                    ProcessDelete(existingTodo, context);
-                    continue;
-                }
-
-                ProcessUpdate(dto, existingTodo, now, context);
+                await _todoRepo.CreateAsync(newTodo);
+                return;
             }
 
-            return context;
-        }
+            var todo = todos.FirstOrDefault(x => x.Id == dto.Id.Value)
+                ?? throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
 
-        private void ProcessCreate(SaveTodoDto dto, int userId, DateTime now, TodoSaveContext context)
-        {
-            if (dto.IsDeleted) return;
-
-            var todo = _mapper.Map<Todo>(dto);
-
-            todo.UserId = userId;
-            todo.CreatedAt = now;
-            todo.Priority = dto.Priority ?? TodoPriority.Medium;
-
-            context.NewTodos.Add(todo);
-
-            context.Activities.Add(new TodoActivity
-            {
-                Todo = todo,
-                Type = TodoActivityType.Created,
-                Description = "Todo created",
-                CreatedAt = now
-            });
-        }
-
-        private void SetConcurrencyVersion(SaveTodoDto dto,  Todo existingTodo)
-        {
             if (dto.RowVersion == null)
                 throw new ConflictException("RowVersion is required", "ROW_VERSION_REQUIRED");
 
-            _todoRepo.SetOriginalValue(
-                existingTodo,
-                todo => todo.RowVersion,
-                dto.RowVersion);
-        }
+            _todoRepo.SetOriginalValue(todo, x => x.RowVersion, dto.RowVersion);
 
-        private static void ProcessDelete(Todo todo, TodoSaveContext context)
-        {
-            context.DeletedTodos.Add(todo);
-        }
-
-        private void ProcessUpdate(SaveTodoDto dto, Todo existingTodo, DateTime now, TodoSaveContext context)
-        {
-            var oldPriority = existingTodo.Priority;
-            var oldCategoryId = existingTodo.CategoryId;
-
-            _mapper.Map(dto, existingTodo);
-            existingTodo.UpdatedAt = now;
-
-            AddUpdateActivities(existingTodo, oldPriority, oldCategoryId, now, context);
-        }
-
-        private static void AddUpdateActivities(Todo todo, TodoPriority oldPriority, int? oldCategoryId, DateTime now, TodoSaveContext context)
-        {
-            if (oldPriority != todo.Priority)
+            if (dto.IsDeleted)
             {
-                context.Activities.Add(new TodoActivity
-                {
-                    TodoId = todo.Id,
-                    Type = TodoActivityType.Updated,
-                    Description = $"Priority changed from {oldPriority} to {todo.Priority}",
-                    CreatedAt = now
-                });
+                await _todoRepo.DeleteAsync(todo);
+                return;
             }
 
-            if (oldCategoryId != todo.CategoryId)
-            {
-                context.Activities.Add(new TodoActivity
-                {
-                    TodoId = todo.Id,
-                    Type = TodoActivityType.CategoryChanged,
-                    Description = "Category changed",
-                    CreatedAt = now
-                });
-            }
+            _mapper.Map(dto, todo);
+            todo.UpdatedAt = DateTime.UtcNow;
         }
-
-        private async Task PersistChangesAsync(TodoSaveContext context)
-        {
-            if (context.NewTodos.Count > 0)
-                await _todoRepo.CreateRangeAsync(context.NewTodos);
-
-            if (context.DeletedTodos.Count > 0)
-                 _todoRepo.DeleteRangeAsync(context.DeletedTodos);
-
-            if (context.Activities.Count > 0)
-                await _activityRepo.CreateRangeAsync(context.Activities);
-
-            try
-            {
-                await _unitOfWork.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                throw new ConflictException(
-                    "One or more todos were modified or deleted by another request",
-                    "TODO_CONCURRENCY_CONFLICT");
-            }
-        }
-
-        private sealed class TodoSaveContext
-        {
-            public List<Todo> NewTodos { get; } = new();
-            public List<Todo> DeletedTodos { get; } = new();
-            public List<TodoActivity> Activities { get; } = new();
-        }
-
     }
 }

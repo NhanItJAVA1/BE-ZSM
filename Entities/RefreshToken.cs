@@ -1,4 +1,4 @@
-﻿namespace BE_ZSM.Entities
+﻿namespace Smart_Financial_Management_SFM_BE.Entities
 {
     public class RefreshToken
     {

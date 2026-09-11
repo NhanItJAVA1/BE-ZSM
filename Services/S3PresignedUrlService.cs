@@ -1,9 +1,8 @@
 using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using Amazon.S3;
 using Amazon.S3.Model;
-using BE_ZSM.Services.Cache;
 
-namespace BE_ZSM.Services
+namespace Smart_Financial_Management_SFM_BE.Services
 {
     public sealed record PresignedUploadResult(
         string UploadUrl,
@@ -21,16 +20,14 @@ namespace BE_ZSM.Services
         private readonly IAmazonS3 _s3Client;
         private readonly string _bucketName;
         private readonly string _region;
-        private readonly ICacheService _cache;
 
-        public S3PresignedUrlService(IAmazonS3 s3Client, IConfiguration configuration, ICacheService cache)
+        public S3PresignedUrlService(IAmazonS3 s3Client, IConfiguration configuration)
         {
             _s3Client = s3Client;
             _bucketName = configuration["AWS_BUCKET_NAME"]
                 ?? throw new InvalidOperationException("AWS_BUCKET_NAME is missing.");
             _region = configuration["AWS_REGION"]
                 ?? throw new InvalidOperationException("AWS_REGION is missing.");
-            _cache = cache;
         }
 
         public PresignedUploadResult CreateVideoUploadUrl(
@@ -142,13 +139,6 @@ namespace BE_ZSM.Services
         {
             var cacheKey = $"presigned-url:{objectKey}";
 
-            var cachedUrl = await _cache.GetAsync<string>(cacheKey);
-
-            if (cachedUrl != null)
-            {
-                return cachedUrl;
-            }
-
             var expiresAt = DateTime.UtcNow.AddMinutes(expiresMinutes);
 
             var request = new GetPreSignedUrlRequest
@@ -160,13 +150,6 @@ namespace BE_ZSM.Services
             };
 
             var url = _s3Client.GetPreSignedURL(request);
-
-            await _cache.SetAsync(
-                cacheKey,
-                url,
-                TimeSpan.FromMinutes(
-                    Math.Max(1, expiresMinutes - 1)));
-
             return url;
         }
 
