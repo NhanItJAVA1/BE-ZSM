@@ -15,15 +15,15 @@ namespace BE_ZSM.Services.TodoService
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGenericRepository<Todo> _todoRepo;
-        private readonly IGenericRepository<TodoCategory> _categoryRepo;
-        private readonly IGenericRepository<TodoActivity> _activityRepo;
+        //private readonly IGenericRepository<TodoCategory> _categoryRepo;
+        //private readonly IGenericRepository<TodoActivity> _activityRepo;
         public TodoService(IMapper mapper, IUnitOfWork unitOfWork)
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _todoRepo = _unitOfWork.GetRepository<Todo>();
-            _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
-            _activityRepo = _unitOfWork.GetRepository<TodoActivity>();
+            //_categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
+            //_activityRepo = _unitOfWork.GetRepository<TodoActivity>();
         }
 
         // GET ALL/FILTER/SORT/SEARCH TODOS
@@ -70,43 +70,46 @@ namespace BE_ZSM.Services.TodoService
         // SAVE BATCH OF TODOS (CREATE, UPDATE, DELETE)
         public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)
         {
-            var todoIds = dtos.Where(x => x.Id.HasValue).Select(x => x.Id!.Value).ToList();
-            var todos = await _todoRepo.Where(x => x.UserId == userId && todoIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
+            //var creates = _mapper.Map<List<Todo>>(dtos.Where(x => !x.Id.HasValue && !x.IsDeleted));
+            //creates.ForEach(x => x.UserId = userId);
+            //await _todoRepo.CreateRangeAsync(creates);
 
-            foreach (var dto in dtos)
-                await ProcessTodoAsync(dto, todos, userId);
+            //var updates = _mapper.Map<List<Todo>>(dtos.Where(x => x.Id.HasValue && !x.IsDeleted));
+            //updates.ForEach(x => { x.UserId = userId; x.UpdatedAt = DateTime.UtcNow; });
+            //_todoRepo.UpdateRange(updates);
+
+            //AutoMapper => map UserId from context items to Todo.UserId
+            var creates = _mapper.Map<List<Todo>>(dtos.Where(x => !x.Id.HasValue && !x.IsDeleted), opt => opt.Items["UserId"] = userId);
+            await _todoRepo.CreateRangeAsync(creates);
+
+            var updates = _mapper.Map<List<Todo>>(dtos.Where(x => x.Id.HasValue && !x.IsDeleted), opt => opt.Items["UserId"] = userId);
+            _todoRepo.UpdateRange(updates);
+
+            var deletedIds = dtos.Where(x => x.Id.HasValue && x.IsDeleted).Select(x => x.Id!.Value).ToList();
+            await _todoRepo.DeleteAsync(x => x.UserId == userId && deletedIds.Contains(x.Id));
 
             await _unitOfWork.SaveChangesAsync();
         }
 
-        private async Task ProcessTodoAsync(SaveTodoDto dto, Dictionary<int, Todo> todos, int userId)
+
+        //Main Flow: if-elseif-else
+        private async Task ProcessTodoAsync(SaveTodoDto dto, int userId)
         {
+            var todo = _mapper.Map<Todo>(dto);
             if (!dto.Id.HasValue)
             {
-                var newTodo = _mapper.Map<Todo>(dto);
-                newTodo.UserId = userId;
-                newTodo.CreatedAt = DateTime.UtcNow;
-
-                await _todoRepo.CreateAsync(newTodo);
-                return;
+                todo.UserId = userId;
+                todo.CreatedAt = DateTime.UtcNow;
+                await _todoRepo.CreateAsync(todo);
             }
-
-            if (!todos.TryGetValue(dto.Id.Value, out var todo))
-                throw new NotFoundException("Todo not found", "TODO_NOT_FOUND");
-
-            if (dto.RowVersion == null)
-                throw new ConflictException("RowVersion is required", "ROW_VERSION_REQUIRED");
-
-            _todoRepo.SetOriginalValue(todo, x => x.RowVersion, dto.RowVersion);
-
-            if (dto.IsDeleted)
+            else if (dto.IsDeleted)
             {
-                await _todoRepo.DeleteAsync(todo);
-                return;
+                await _todoRepo.DeleteByIdAsync(dto.Id!.Value);
             }
-
-            _mapper.Map(dto, todo);
-            todo.UpdatedAt = DateTime.UtcNow;
+            else {
+                todo.UpdatedAt = DateTime.UtcNow;
+                await _todoRepo.UpdateAsync(todo);
+            }            
         }
 
         //public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)

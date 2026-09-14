@@ -1,5 +1,6 @@
-﻿
-namespace Smart_Financial_Management_SFM_BE.Entities
+﻿using BE_ZSM.Enums;
+
+namespace BE_ZSM.Entities
 {
     public class ExternalLogin
     {

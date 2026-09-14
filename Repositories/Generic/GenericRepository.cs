@@ -64,10 +64,9 @@ public class GenericRepository<T>
         return await Task.FromResult(item);
     }
 
-    public async Task UpdateRangeAsync(IEnumerable<T> items)
+    public void UpdateRange(IEnumerable<T> items)
     {
         _dbSet.UpdateRange(items);
-        await Task.CompletedTask;
     }
 
     public async Task DeleteAsync(T item)
@@ -85,5 +84,22 @@ public class GenericRepository<T>
         _context.Entry(entity)
             .Property(property)
             .OriginalValue = value;
+    }
+
+    public Task DeleteByIdAsync(object id)
+    {
+        var entity = _dbSet.Find(id);
+        if (entity != null)
+        {
+            _dbSet.Remove(entity);
+        }
+        return Task.CompletedTask;
+    }
+
+    public async Task DeleteAsync(Expression<Func<T, bool>> predicate)
+    {
+        await _dbSet
+        .Where(predicate)
+        .ExecuteDeleteAsync();
     }
 }

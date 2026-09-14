@@ -4,7 +4,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using BE_ZSM.Entities;
-namespace Smart_Financial_Management_SFM_BE.Services
+namespace BE_ZSM.Services
 {
     public class JwtService
     {

@@ -13,7 +13,7 @@ namespace BE_ZSM.Entities
         public DateTime? DueDate { get; set; }
         public int UserId { get; set; }
         public User User { get; set; } = null!;
-        public DateTime CreatedAt { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public int? CategoryId { get; set; }

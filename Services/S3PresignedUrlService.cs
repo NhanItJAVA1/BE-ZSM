@@ -2,7 +2,7 @@ using Amazon.Runtime.Internal.Endpoints.StandardLibrary;
 using Amazon.S3;
 using Amazon.S3.Model;
 
-namespace Smart_Financial_Management_SFM_BE.Services
+namespace BE_ZSM.Services
 {
     public sealed record PresignedUploadResult(
         string UploadUrl,

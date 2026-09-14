@@ -3,7 +3,7 @@ using BE_ZSM.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 
-namespace Smart_Financial_Management_SFM_BE.Middlewares
+namespace BE_ZSM.Middlewares
 {
     public class GlobalExceptionHandler : IExceptionHandler
     {

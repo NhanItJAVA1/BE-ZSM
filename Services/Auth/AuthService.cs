@@ -1,11 +1,16 @@
 using AutoMapper;
-using Smart_Financial_Management_SFM_BE.DTOs.Auth;
-using Smart_Financial_Management_SFM_BE.DTOs.Users;
-
+using BE_ZSM.DTOs.Auth;
+using BE_ZSM.DTOs.Users;
+using BE_ZSM.Entities;
+using BE_ZSM.Enums;
+using BE_ZSM.Exceptions;
+using BE_ZSM.Repositories.Generic;
+using BE_ZSM.Services.Auth.Models;
+using BE_ZSM.Services.Provider;
 using Microsoft.EntityFrameworkCore;
-using ExternalLoginEntity = Smart_Financial_Management_SFM_BE.Entities.ExternalLogin;
+using ExternalLoginEntity = BE_ZSM.Entities.ExternalLogin;
 
-namespace Smart_Financial_Management_SFM_BE.Services.Auth;
+namespace BE_ZSM.Services.Auth;
 
 public class AuthService : IAuthService
 {
@@ -13,13 +18,17 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtService _jwtService;
     private readonly IMapper _mapper;
+
+    private readonly IGenericRepository<User> _userRepo;
+    private readonly IGenericRepository<Role> _roleRepo;
+    private readonly IGenericRepository<RefreshToken> _refreshTokenRepo;
     private readonly IGenericRepository<ExternalLoginEntity> _externalLoginRepo;
 
     public AuthService(
-        IEnumerable<IExternalAuthProvider> providers,
-        IUnitOfWork unitOfWork,
-        JwtService jwtService,
-        IMapper mapper)
+    IEnumerable<IExternalAuthProvider> providers,
+    IUnitOfWork unitOfWork,
+    JwtService jwtService,
+    IMapper mapper)
     {
         _providers = providers;
         _unitOfWork = unitOfWork;
