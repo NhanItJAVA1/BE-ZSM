@@ -17,9 +17,7 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         _httpContextAccessor = httpContextAccessor;
     }
 
-    protected override async Task HandleRequirementAsync(
-        AuthorizationHandlerContext context,
-        PermissionRequirement requirement)
+    protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
         if (!PermissionCodes.All.Contains(requirement.Code)
             || context.User.Identity?.IsAuthenticated != true
