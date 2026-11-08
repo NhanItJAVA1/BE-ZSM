@@ -11,6 +11,9 @@ using BE_ZSM.Services.Auth;
 using BE_ZSM.Services.Auth.Models;
 using BE_ZSM.Services.Provider;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Moq;
 
 namespace BE_ZSM.Tests;
@@ -33,10 +36,18 @@ public sealed class AuthServiceTests : IDisposable
             .Options;
 
         _db = new AppDbContext(options);
-        _db.Roles.Add(new Role { Id = 1, Name = UserRole.User, Description = "Regular User" });
+        _db.Roles.Add(new Role { Id = 1, Name = "User", Description = "Regular User" });
         _db.SaveChanges();
 
         var mapper = new Mock<IMapper>();
+        mapper.Setup(x => x.Map<User>(It.IsAny<RegisterUserDto>()))
+            .Returns((RegisterUserDto dto) => new User
+            {
+                Username = dto.Username,
+                Email = dto.Email,
+                DisplayName = dto.DisplayName,
+                AvatarUrl = dto.AvatarUrl
+            });
         mapper.Setup(x => x.Map<UserResponseDto>(It.IsAny<User>()))
             .Returns((User user) => new UserResponseDto
             {
@@ -78,6 +89,65 @@ public sealed class AuthServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Register_CreatesDefaultUserRoleWithoutClientRoleInput()
+    {
+        await _service.RegisterAsync(new RegisterUserDto
+        {
+            Username = "new-user",
+            Email = "new-user@example.test",
+            Password = "secret",
+            DisplayName = "New User"
+        });
+
+        var user = await _db.Users.Include(x => x.UserRoles).SingleAsync();
+        Assert.Equal(1, user.RoleId);
+        Assert.Collection(user.UserRoles, membership => Assert.Equal(1, membership.RoleId));
+    }
+
+    [Fact]
+    public async Task Login_EmitsAllDistinctUserRolesAndRefreshReadsCurrentRoles()
+    {
+        await SeedLocalUserAsync();
+        _db.Roles.Add(new Role { Id = 2, Name = "Admin", Description = "Administrator" });
+        _db.UserRoles.Add(new BE_ZSM.Entities.Rbac.UserRole { UserId = 1, RoleId = 2 });
+        await _db.SaveChangesAsync();
+
+        var login = await LoginLocalUserAsync();
+        var claims = new JwtSecurityTokenHandler().ReadJwtToken(login.AccessToken).Claims;
+        Assert.Contains(claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "User");
+        Assert.Contains(claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+        Assert.True(new ClaimsPrincipal(new ClaimsIdentity(claims, "test")).IsInRole("Admin"));
+
+        _db.UserRoles.RemoveRange(_db.UserRoles.Where(x => x.RoleId == 2));
+        await _db.SaveChangesAsync();
+        var refreshed = await _service.RefreshTokenAsync(login.RefreshToken);
+        var refreshedClaims = new JwtSecurityTokenHandler().ReadJwtToken(refreshed.AccessToken).Claims;
+        Assert.DoesNotContain(refreshedClaims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");
+    }
+
+    [Fact]
+    public void UserResponseMapping_KeepsLegacyRoleAndReturnsAllMemberships()
+    {
+        var mapper = new MapperConfiguration(
+            config => config.AddProfile<MappingProfile>(),
+            NullLoggerFactory.Instance).CreateMapper();
+        var user = new User
+        {
+            Role = new Role { Id = 1, Name = "User" },
+            UserRoles =
+            [
+                new BE_ZSM.Entities.Rbac.UserRole { Role = new Role { Id = 2, Name = "Admin" } },
+                new BE_ZSM.Entities.Rbac.UserRole { Role = new Role { Id = 1, Name = "User" } }
+            ]
+        };
+
+        var response = mapper.Map<UserResponseDto>(user);
+
+        Assert.Equal("User", response.Role);
+        Assert.Equal(new[] { "Admin", "User" }, response.Roles);
+    }
+
+    [Fact]
     public async Task GoogleLogin_RefreshToken_ShouldSucceed()
     {
         var login = await _service.ExternalLoginAsync(new ExternalLoginDto
@@ -94,6 +164,7 @@ public sealed class AuthServiceTests : IDisposable
         Assert.Equal("google-user@example.test", refresh.User.Email);
         Assert.Single(_db.ExternalLogins);
         Assert.Single(_db.RefreshTokens);
+        Assert.Single(_db.UserRoles);
     }
 
     [Fact]
@@ -206,6 +277,7 @@ public sealed class AuthServiceTests : IDisposable
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret"),
             DisplayName = "Local User",
             RoleId = 1,
+            UserRoles = { new BE_ZSM.Entities.Rbac.UserRole { RoleId = 1 } },
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         });
@@ -239,3 +311,4 @@ public sealed class AuthServiceTests : IDisposable
         }
     }
 }
+

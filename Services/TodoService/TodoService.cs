@@ -15,15 +15,13 @@ namespace BE_ZSM.Services.TodoService
         private readonly IMapper _mapper;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGenericRepository<Todo> _todoRepo;
-        //private readonly IGenericRepository<TodoCategory> _categoryRepo;
-        //private readonly IGenericRepository<TodoActivity> _activityRepo;
+        private readonly IGenericRepository<TodoCategory> _categoryRepo;
         public TodoService(IMapper mapper, IUnitOfWork unitOfWork)
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _todoRepo = _unitOfWork.GetRepository<Todo>();
-            //_categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
-            //_activityRepo = _unitOfWork.GetRepository<TodoActivity>();
+            _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
         }
 
         // GET ALL/FILTER/SORT/SEARCH TODOS
@@ -38,8 +36,7 @@ namespace BE_ZSM.Services.TodoService
             if (!string.IsNullOrWhiteSpace(queryDto.Search))
             {
                 var search = queryDto.Search.Trim();
-                query = query.Where(t =>
-                    t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
+                query = query.Where(t => t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
             }
 
             if (queryDto.Status.HasValue) query = query.Where(t => t.Status == queryDto.Status.Value);
@@ -70,22 +67,46 @@ namespace BE_ZSM.Services.TodoService
         // SAVE BATCH OF TODOS (CREATE, UPDATE, DELETE)
         public async Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId)
         {
-            //var creates = _mapper.Map<List<Todo>>(dtos.Where(x => !x.Id.HasValue && !x.IsDeleted));
-            //creates.ForEach(x => x.UserId = userId);
-            //await _todoRepo.CreateRangeAsync(creates);
+            var categoryIds = dtos
+                .Where(dto => !dto.IsDeleted && dto.CategoryId.HasValue)
+                .Select(dto => dto.CategoryId!.Value)
+                .Distinct()
+                .ToList();
 
-            //var updates = _mapper.Map<List<Todo>>(dtos.Where(x => x.Id.HasValue && !x.IsDeleted));
-            //updates.ForEach(x => { x.UserId = userId; x.UpdatedAt = DateTime.UtcNow; });
-            //_todoRepo.UpdateRange(updates);
+            if (categoryIds.Count > 0)
+            {
+                var ownedCategoryCount = await _categoryRepo
+                    .Where(category => category.UserId == userId && categoryIds.Contains(category.Id))
+                    .CountAsync();
 
-            //AutoMapper => map UserId from context items to Todo.UserId
+                if (ownedCategoryCount != categoryIds.Count)
+                    throw new NotFoundException("One or more categories not found", "CATEGORY_NOT_FOUND");
+            }
+
             var creates = _mapper.Map<List<Todo>>(dtos.Where(x => !x.Id.HasValue && !x.IsDeleted), opt => opt.Items["UserId"] = userId);
             await _todoRepo.CreateRangeAsync(creates);
 
-            var updates = _mapper.Map<List<Todo>>(dtos.Where(x => x.Id.HasValue && !x.IsDeleted), opt => opt.Items["UserId"] = userId);
-            _todoRepo.UpdateRange(updates);
+            var updates = dtos.Where(x => x.Id.HasValue && !x.IsDeleted).ToList();
+            var updateIds = updates.Select(x => x.Id!.Value).Distinct().ToList();
+            var existingTodos = await _todoRepo
+                .Where(todo => todo.UserId == userId && updateIds.Contains(todo.Id))
+                .ToDictionaryAsync(todo => todo.Id);
+
+            if (existingTodos.Count != updateIds.Count)
+                throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");
+
+            foreach (var dto in updates)
+                _mapper.Map(dto, existingTodos[dto.Id!.Value], opt => opt.Items["UserId"] = userId);
 
             var deletedIds = dtos.Where(x => x.Id.HasValue && x.IsDeleted).Select(x => x.Id!.Value).ToList();
+            var distinctDeletedIds = deletedIds.Distinct().ToList();
+            var ownedDeletedCount = await _todoRepo
+                .Where(todo => todo.UserId == userId && distinctDeletedIds.Contains(todo.Id))
+                .CountAsync();
+
+            if (ownedDeletedCount != distinctDeletedIds.Count)
+                throw new NotFoundException("One or more todos not found", "TODO_NOT_FOUND");
+
             await _todoRepo.DeleteAsync(x => x.UserId == userId && deletedIds.Contains(x.Id));
 
             await _unitOfWork.SaveChangesAsync();

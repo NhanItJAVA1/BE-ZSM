@@ -1,6 +1,7 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using BE_ZSM.Contexts;
+using BE_ZSM.Authorization;
 using BE_ZSM.Helpers;
 using BE_ZSM.Middlewares;
 using BE_ZSM.Repositories.Generic;
@@ -11,9 +12,10 @@ using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Category;
 using BE_ZSM.Services.Interfaces;
 using BE_ZSM.Services.Provider;
+using BE_ZSM.Services.Rbac;
 using BE_ZSM.Services.TodoService;
-using BE_ZSM.Services.Vehicle;
 using DotNetEnv;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -80,21 +82,10 @@ public partial class Program
                 };
             });
 
-        builder.Services.AddAuthorization(options =>
-        {
-            options.AddPolicy("AdminOnly", policy =>
-                policy.RequireAssertion(context =>
-                {
-                    var user = context.User;
-                    string[] adminRoles = ["Admin", "ADMIN", "admin"];
-
-                    return adminRoles.Any(role => user.IsInRole(role))
-                        || user.Claims.Any(claim =>
-                            (claim.Type == ClaimTypes.Role || claim.Type == "role")
-                            && adminRoles.Any(role =>
-                                string.Equals(claim.Value, role, StringComparison.OrdinalIgnoreCase)));
-                }));
-        });
+        builder.Services.AddAuthorization();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+        builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         builder.Services.AddCors(options =>
         {
@@ -109,16 +100,12 @@ public partial class Program
         builder.Services.AddScoped<JwtService>();
         builder.Services.AddHttpClient<IExternalAuthProvider, GoogleAuthProvider>();
         builder.Services.AddScoped<DbSaveHelper>();
-        builder.Services.AddScoped<AdminAccessHelper>();
         builder.Services.AddScoped<S3PresignedUrlService>();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddProblemDetails();
-        builder.Services.AddScoped<IVehicleService, VehicleService>();
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddScoped<IUserService, UserService>();
-        builder.Services.AddScoped<IRecordService,RecordService>();
-        builder.Services.AddScoped<IMapService, MapService>();
-        builder.Services.AddScoped<IGameModeService,GameModeService>();
+        builder.Services.AddScoped<IRbacManagementService, RbacManagementService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
         builder.Services.AddScoped<ITodoService, TodoService>();
         builder.Services.AddScoped<ITodoCategoryService, TodoCategoryService>();

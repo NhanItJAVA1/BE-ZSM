@@ -1,5 +1,4 @@
 using System.Net;
-using BE_ZSM.Enums;
 
 namespace BE_ZSM.Tests;
 
@@ -106,15 +105,13 @@ public sealed class TodoCategoryApiTests : IntegrationTestBase
     }
 
     [Fact]
-    public async Task UpdateCategory_AnotherUsersCategory_ShouldReturnNotFound()
+    public async Task UpdateCategory_AnotherUsersCategory_ShouldReturnForbidden()
     {
         var category = await CreateCategoryAsync(UserBClient, "Foreign update category");
 
         var response = await UserAClient.PutAsJsonAsync($"/api/todo-categories/{Id(category)}", new { name = "Illegal update" }, JsonOptions);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var json = await ReadJsonAsync(response);
-        Assert.Equal("CATEGORY_NOT_FOUND", ErrorCode(json));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -139,32 +136,4 @@ public sealed class TodoCategoryApiTests : IntegrationTestBase
         Assert.Equal("CATEGORY_NOT_FOUND", ErrorCode(json));
     }
 
-    [Fact]
-    public async Task DeleteCategory_WithDeleteTodosFalse_ShouldKeepTodosAndClearCategoryId()
-    {
-        var category = await CreateCategoryAsync(UserAClient, "Clear category");
-        var todo = await CreateTodoAsync(UserAClient, "Clear category todo", priority: TodoPriority.Low, categoryId: Id(category));
-
-        var response = await UserAClient.DeleteAsync($"/api/todo-categories/{Id(category)}?deleteTodos=false");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var todoResponse = await UserAClient.GetAsync($"/api/todos/{Id(todo)}");
-        Assert.Equal(HttpStatusCode.OK, todoResponse.StatusCode);
-        var updatedTodo = await ReadJsonAsync(todoResponse);
-        Assert.True(updatedTodo.GetProperty("categoryId").ValueKind is System.Text.Json.JsonValueKind.Null);
-        Assert.True(updatedTodo.GetProperty("categoryName").ValueKind is System.Text.Json.JsonValueKind.Null);
-    }
-
-    [Fact]
-    public async Task DeleteCategory_WithDeleteTodosTrue_ShouldDeleteAssociatedTodos()
-    {
-        var category = await CreateCategoryAsync(UserAClient, "Delete todos category");
-        var todo = await CreateTodoAsync(UserAClient, "Deleted with category todo", priority: TodoPriority.High, categoryId: Id(category));
-
-        var response = await UserAClient.DeleteAsync($"/api/todo-categories/{Id(category)}?deleteTodos=true");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var todoResponse = await UserAClient.GetAsync($"/api/todos/{Id(todo)}");
-        Assert.Equal(HttpStatusCode.NotFound, todoResponse.StatusCode);
-    }
 }

@@ -31,9 +31,13 @@ namespace BE_ZSM.Services
 
         public string GenerateToken(User user)
         {
-            var roleName = user.Role.Name.ToString();
+            return GenerateToken(user, user.UserRoles.Select(ur => ur.Role.Name));
+        }
 
-            var claims = new[]
+        public string GenerateToken(User user, IEnumerable<string> roleNames)
+        {
+
+            var claims = new List<Claim>
             {
                 new Claim(
                     ClaimTypes.NameIdentifier,
@@ -50,16 +54,12 @@ namespace BE_ZSM.Services
                     user.Email
                 ),
 
-                new Claim(
-                    ClaimTypes.Role,
-                    roleName
-                ),
-
-                new Claim(
-                    "role",
-                    roleName
-                )
             };
+            foreach (var roleName in roleNames.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, roleName));
+                claims.Add(new Claim("role", roleName));
+            }
 
             var key = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(_jwtKey)

@@ -1,4 +1,5 @@
 using BE_ZSM.DTOs.Catalog;
+using BE_ZSM.Authorization;
 using BE_ZSM.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,7 @@ namespace BE_ZSM.Controllers
             _s3PresignedUrlService = s3PresignedUrlService;
         }
 
-        [Authorize(Roles = "Admin")]
+        [HasPermission(PermissionCodes.CatalogUpload)]
         [HttpPost("image-upload-url")]
         public ActionResult<CatalogImageUploadResponseDto> CreateImageUploadUrl(
             [FromBody] CreateCatalogImageUploadDto dto)
@@ -56,3 +57,4 @@ namespace BE_ZSM.Controllers
         }
     }
 }
+

@@ -2,7 +2,7 @@ using AutoMapper;
 using BE_ZSM.DTOs.Auth;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
-using BE_ZSM.Enums;
+using BE_ZSM.Entities.Rbac;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Services.Auth.Models;
@@ -51,6 +51,7 @@ public class AuthService : IAuthService
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
         user.RoleId = userRole.Id;
+        user.UserRoles.Add(new UserRole { User = user, Role = userRole, RoleId = userRole.Id });
         user.CreatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
@@ -62,6 +63,7 @@ public class AuthService : IAuthService
     {
         var user = await _userRepo.Where(u => u.Username == dto.Username)
             .Include(u => u.Role)
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync();
 
         if (user == null || !IsPasswordValid(dto.Password, user.PasswordHash))
@@ -85,6 +87,8 @@ public class AuthService : IAuthService
             .Where(rt => rt.Token == token)
             .Include(rt => rt.User)
             .ThenInclude(u => u.Role)
+            .Include(rt => rt.User)
+            .ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync();
 
         if (!IsRefreshTokenActive(refreshToken))
@@ -143,6 +147,8 @@ public class AuthService : IAuthService
         return await _externalLoginRepo.All()
             .Include(x => x.User)
             .ThenInclude(x => x.Role)
+            .Include(x => x.User)
+            .ThenInclude(x => x.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(x =>
                 x.Provider == dto.Provider &&
                 x.ProviderUserId == providerUserId);
@@ -152,6 +158,7 @@ public class AuthService : IAuthService
     {
         return await _userRepo.Where(x => x.Email == email)
             .Include(x => x.Role)
+            .Include(x => x.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync();
     }
 
@@ -159,7 +166,7 @@ public class AuthService : IAuthService
     {
         var userRole = await GetDefaultUserRoleAsync();
 
-        return new User
+        var user = new User
         {
             Email = externalUser.Email,
             Username = externalUser.Email,
@@ -170,6 +177,8 @@ public class AuthService : IAuthService
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+        user.UserRoles.Add(new UserRole { User = user, Role = userRole, RoleId = userRole.Id });
+        return user;
     }
 
     private async Task<User> LinkExternalLoginAsync(
@@ -228,7 +237,7 @@ public class AuthService : IAuthService
 
     private string CreateAccessToken(User user)
     {
-        return _jwtService.GenerateToken(user);
+        return _jwtService.GenerateToken(user, user.UserRoles.Select(ur => ur.Role.Name));
     }
 
     private async Task EnsureUsernameAvailableAsync(string username)
@@ -253,7 +262,7 @@ public class AuthService : IAuthService
 
     private async Task<Role> GetDefaultUserRoleAsync()
     {
-        var userRole = await _roleRepo.Where(r => r.Name == UserRole.User)
+        var userRole = await _roleRepo.Where(r => r.Name == "User")
             .FirstOrDefaultAsync();
 
         if (userRole == null)
@@ -281,3 +290,6 @@ public class AuthService : IAuthService
             entry.State = EntityState.Detached;
     }
 }
+
+
+

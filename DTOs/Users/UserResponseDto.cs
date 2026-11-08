@@ -16,6 +16,8 @@ public class UserResponseDto
 
     public string Role { get; set; } = string.Empty;
 
+    public List<string> Roles { get; set; } = [];
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }

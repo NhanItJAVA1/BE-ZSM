@@ -1,4 +1,5 @@
-﻿using BE_ZSM.DTOs.Todos.Categories;
+using BE_ZSM.DTOs.Todos.Categories;
+using BE_ZSM.Authorization;
 using BE_ZSM.Services.Category;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ public class TodoCategoryController : ControllerBase
     }
 
     [HttpGet]
+    [HasPermission(PermissionCodes.TodoCategoryRead)]
     public async Task<IActionResult> GetCategories()
     {
         var categories = await _categoryService.GetCategoriesAsync(GetCurrentUserId());
@@ -26,6 +28,7 @@ public class TodoCategoryController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [HasPermission(PermissionCodes.TodoCategoryRead)]
     public async Task<IActionResult> GetCategory(int id)
     {
         var category = await _categoryService.GetCategoryAsync(id, GetCurrentUserId());
@@ -33,6 +36,7 @@ public class TodoCategoryController : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission(PermissionCodes.TodoCategoryCreate)]
     public async Task<IActionResult> CreateCategory(CreateTodoCategoryDto dto)
     {
         await _categoryService.CreateCategoryAsync(dto, GetCurrentUserId());
@@ -40,6 +44,7 @@ public class TodoCategoryController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [HasPermission(PermissionCodes.TodoCategoryUpdate)]
     public async Task<IActionResult> UpdateCategory(int id, UpdateTodoCategoryDto dto)
     {
         await _categoryService.UpdateCategoryAsync(id, dto, GetCurrentUserId());
@@ -47,6 +52,7 @@ public class TodoCategoryController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [HasPermission(PermissionCodes.TodoCategoryDelete)]
     public async Task<IActionResult> DeleteCategory(int id, [FromQuery] bool deleteTodos = false)
     {
         await _categoryService.DeleteCategoryAsync(id, GetCurrentUserId(), deleteTodos);

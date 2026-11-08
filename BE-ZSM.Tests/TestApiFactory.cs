@@ -4,8 +4,9 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using BE_ZSM.Contexts;
+using BE_ZSM.Authorization;
 using BE_ZSM.Entities;
-using BE_ZSM.Enums;
+using BE_ZSM.Entities.Rbac;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -58,8 +59,13 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
 
     public HttpClient CreateAuthenticatedClient(int userId)
     {
+        return CreateAuthenticatedClientWithRoles(userId, "User");
+    }
+
+    public HttpClient CreateAuthenticatedClientWithRoles(int userId, params string[] roles)
+    {
         var client = CreateClient();
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateJwt(userId));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", CreateJwt(userId, roles));
         return client;
     }
 
@@ -76,8 +82,8 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
         await db.SaveChangesAsync();
 
         db.Roles.AddRange(
-            new Role { Id = 1, Name = UserRole.User, Description = "Regular User" },
-            new Role { Id = 2, Name = UserRole.Admin, Description = "Administrator" });
+            new Role { Id = 1, Name = "User", Description = "Regular User" },
+            new Role { Id = 2, Name = "Admin", Description = "Administrator" });
 
         db.Users.AddRange(
             new User
@@ -104,20 +110,73 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
             });
 
         await db.SaveChangesAsync();
+
+        var permissions = new[]
+        {
+            (PermissionCodes.TodoRead, "Read todos"),
+            (PermissionCodes.TodoWrite, "Create, update, and delete todos"),
+            (PermissionCodes.TodoCategoryRead, "Read todo categories"),
+            (PermissionCodes.TodoCategoryCreate, "Create todo categories"),
+            (PermissionCodes.TodoCategoryUpdate, "Update todo categories"),
+            (PermissionCodes.TodoCategoryDelete, "Delete todo categories"),
+            (PermissionCodes.CatalogUpload, "Create catalog upload URLs"),
+            (PermissionCodes.UsersRead, "Read users"),
+            (PermissionCodes.UsersUpdate, "Update users"),
+            (PermissionCodes.UsersDelete, "Delete users"),
+            (PermissionCodes.RolesRead, "View roles"),
+            (PermissionCodes.RolesCreate, "Create roles"),
+            (PermissionCodes.RolesUpdate, "Update roles"),
+            (PermissionCodes.RolesDelete, "Delete roles"),
+            (PermissionCodes.RolesManagePermissions, "Replace role permissions"),
+            (PermissionCodes.UsersManageRoles, "Replace user roles"),
+            (PermissionCodes.PermissionsRead, "View permissions")
+        };
+        db.Permissions.AddRange(permissions.Select((permission, index) => new Permission
+        {
+            Id = index + 1,
+            Code = permission.Item1,
+            Description = permission.Item2
+        }));
+        db.UserRoles.AddRange(
+            new UserRole { UserId = TestUsers.UserAId, RoleId = 1 },
+            new UserRole { UserId = TestUsers.UserBId, RoleId = 1 });
+        await db.SaveChangesAsync();
+
+        var userPermissionCodes = new[]
+        {
+            PermissionCodes.TodoRead,
+            PermissionCodes.TodoWrite,
+            PermissionCodes.TodoCategoryRead,
+            PermissionCodes.TodoCategoryCreate,
+            PermissionCodes.TodoCategoryUpdate,
+            PermissionCodes.TodoCategoryDelete
+        };
+        var permissionIds = await db.Permissions.ToDictionaryAsync(permission => permission.Code, permission => permission.Id);
+        db.RolePermissions.AddRange(userPermissionCodes.Select(code => new RolePermission
+        {
+            RoleId = 1,
+            PermissionId = permissionIds[code]
+        }));
+        db.RolePermissions.AddRange(permissions.Select(permission => new RolePermission
+        {
+            RoleId = 2,
+            PermissionId = permissionIds[permission.Item1]
+        }));
+        await db.SaveChangesAsync();
     }
 
-    private static string CreateJwt(int userId)
+    private static string CreateJwt(int userId, IEnumerable<string> roles)
     {
         var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER")!;
         var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")!;
         var key = Environment.GetEnvironmentVariable("JWT_KEY")!;
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-            new Claim(ClaimTypes.Name, $"todo-user-{userId}"),
-            new Claim(ClaimTypes.Role, "User")
+            new Claim(ClaimTypes.Name, $"todo-user-{userId}")
         };
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
         var credentials = new SigningCredentials(
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
@@ -157,45 +216,10 @@ public abstract class IntegrationTestBase : IAsyncLifetime, IDisposable
         Factory.Dispose();
     }
 
-    protected static object TodoRequest(
-        string title,
-        string? description = null,
-        TodoPriority? priority = null,
-        DateTime? dueDate = null,
-        int? categoryId = null)
-    {
-        return new
-        {
-            title,
-            description,
-            priority,
-            dueDate,
-            categoryId
-        };
-    }
-
     protected async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)
     {
         var json = await response.Content.ReadAsStringAsync();
         return JsonSerializer.Deserialize<JsonElement>(json, JsonOptions);
-    }
-
-    protected async Task<JsonElement> CreateTodoAsync(
-        HttpClient client,
-        string title,
-        string? description = null,
-        TodoPriority? priority = null,
-        DateTime? dueDate = null,
-        int? categoryId = null)
-    {
-        var response = await client.PostAsJsonAsync("/api/todos", new[]
-        {
-            TodoRequest(title, description, priority, dueDate, categoryId)
-        }, JsonOptions);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        return await GetSingleTodoByTitleAsync(client, title);
     }
 
     protected async Task<JsonElement> CreateCategoryAsync(HttpClient client, string name)
@@ -210,16 +234,6 @@ public abstract class IntegrationTestBase : IAsyncLifetime, IDisposable
         return categories.EnumerateArray().Single(c => c.GetProperty("name").GetString() == name);
     }
 
-    protected async Task<JsonElement> GetSingleTodoByTitleAsync(HttpClient client, string title)
-    {
-        var response = await client.GetAsync($"/api/todos?search={Uri.EscapeDataString(title)}");
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var page = await ReadJsonAsync(response);
-        return page.GetProperty("items").EnumerateArray()
-            .Single(t => t.GetProperty("title").GetString() == title);
-    }
-
     protected static int Id(JsonElement element) => element.GetProperty("id").GetInt32();
 
     protected static string ErrorCode(JsonElement element) => element.GetProperty("errorCode").GetString()!;
@@ -230,3 +244,4 @@ public static class TestUsers
     public const int UserAId = 1001;
     public const int UserBId = 1002;
 }
+

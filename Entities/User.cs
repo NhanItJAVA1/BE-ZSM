@@ -22,10 +22,10 @@
 
         public DateTime UpdatedAt { get; set; }
 
-        public ICollection<Record> Records { get; set; } = new List<Record>();
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public ICollection<Todo> Todos { get; set; } = [];
         public ICollection<TodoCategory> TodoCategories { get; set; } = [];
         public ICollection<ExternalLogin> ExternalLogins { get; set; } = [];
+        public ICollection<Rbac.UserRole> UserRoles { get; set; } = [];
     }
 }

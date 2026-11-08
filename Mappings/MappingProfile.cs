@@ -1,11 +1,7 @@
-﻿using AutoMapper;
-using BE_ZSM.DTOs.GameModes;
-using BE_ZSM.DTOs.Maps;
-using BE_ZSM.DTOs.Records;
+using AutoMapper;
 using BE_ZSM.DTOs.Todos;
 using BE_ZSM.DTOs.Todos.Categories;
 using BE_ZSM.DTOs.Users;
-using BE_ZSM.DTOs.Vehicles;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 public class MappingProfile : Profile
@@ -17,35 +13,11 @@ public class MappingProfile : Profile
         CreateMap<User, UserResponseDto>()
             .ForMember(
                 dest => dest.Role,
-                opt => opt.MapFrom(src => src.Role.Name.ToString())
-            );
-
-        CreateMap<CreateVehicleDto, Vehicle>();
-        CreateMap<UpdateVehicleDto, Vehicle>();
-        CreateMap<Vehicle, VehicleResponseDto>();
-
-        CreateMap<Record, RecordResponseDto>()
-            .ForMember(
-                dest => dest.FinishTime,
-                opt => opt.MapFrom(src => src.FinishTime.TotalSeconds)
-            );
-        CreateMap<CreateRecordDto, Record>();
-        CreateMap<User, UserMinimalDto>();
-        CreateMap<Map, MapMinimalDto>()
-            .ForMember(
-                dest => dest.Rate,
-                opt => opt.MapFrom(src => src.Rate.ToString())
-            );
-        CreateMap<Vehicle, VehicleMinimalDto>();
-        CreateMap<GameMode, GameModeMinimalDto>();
-        
-        CreateMap<Map, MapResponseDto>();
-        CreateMap<CreateMapDto, Map>();
-        CreateMap<UpdateMapDto, Map>();
-
-        CreateMap<GameMode, GameModeResponseDto>();
-        CreateMap<CreateGameModeDto, GameMode>();
-        CreateMap<UpdateGameModeDto, GameMode>();
+                opt => opt.MapFrom(src => src.Role.Name))
+            .ForMember(dest => dest.Roles, opt => opt.MapFrom(src => src.UserRoles
+                .Select(ur => ur.Role.Name)
+                .Distinct()
+                .OrderBy(name => name)));
 
         CreateMap<Todo, TodoDto>()
            .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))
@@ -93,3 +65,4 @@ public class MappingProfile : Profile
         CreateMap<TodoActivity, TodoActivityDto>();
     }
 }
+

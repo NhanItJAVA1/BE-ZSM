@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using BE_ZSM.Entities;
+using BE_ZSM.Entities.Rbac;
 
 namespace BE_ZSM.Contexts
 {
@@ -9,10 +10,9 @@ namespace BE_ZSM.Contexts
         public DbSet<User> Users { get; set; }
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Role> Roles { get; set; }
-        public DbSet<Map> Maps { get; set; }
-        public DbSet<Vehicle> Vehicles { get; set; }
-        public DbSet<GameMode> GameModes { get; set; }
-        public DbSet<Record> Records { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<Permission> Permissions { get; set; }
+        public DbSet<RolePermission> RolePermissions { get; set; }
         public DbSet<Todo> Todos { get; set; }
         public DbSet<TodoCategory> TodoCategories { get; set; }
         public DbSet<TodoActivity> TodoActivities { get; set; }
@@ -33,12 +33,67 @@ namespace BE_ZSM.Contexts
 
             modelBuilder.Entity<Role>(entity =>
             {
-                entity.Property(r => r.Name).HasConversion<int>();
+                entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
+                entity.HasIndex(r => r.Name).IsUnique();
+                entity.Property(r => r.NameNormalized)
+                    .HasMaxLength(50)
+                    .HasComputedColumnSql("UPPER([Name])", stored: true);
+                entity.HasIndex(r => r.NameNormalized).IsUnique();
                 entity.Property(r => r.Id).ValueGeneratedNever();
                 entity.HasData(
-                    new Role { Id = 2, Name = Enums.UserRole.Admin, Description = "Administrator" },
-                    new Role { Id = 1, Name = Enums.UserRole.User, Description = "Regular User" }
+                    new Role { Id = 2, Name = "Admin", Description = "Administrator" },
+                    new Role { Id = 1, Name = "User", Description = "Regular User" }
                 );
+            });
+
+            modelBuilder.Entity<UserRole>(entity =>
+            {
+                entity.HasKey(userRole => new { userRole.UserId, userRole.RoleId });
+
+                entity.HasOne(userRole => userRole.User)
+                    .WithMany(user => user.UserRoles)
+                    .HasForeignKey(userRole => userRole.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(userRole => userRole.Role)
+                    .WithMany(role => role.UserRoles)
+                    .HasForeignKey(userRole => userRole.RoleId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasIndex(userRole => userRole.RoleId);
+            });
+
+            modelBuilder.Entity<Permission>(entity =>
+            {
+                entity.HasKey(permission => permission.Id);
+
+                entity.Property(permission => permission.Code)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(permission => permission.Description)
+                    .IsRequired()
+                    .HasMaxLength(500);
+
+                entity.HasIndex(permission => permission.Code)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<RolePermission>(entity =>
+            {
+                entity.HasKey(rolePermission => new { rolePermission.RoleId, rolePermission.PermissionId });
+
+                entity.HasOne(rolePermission => rolePermission.Role)
+                    .WithMany(role => role.RolePermissions)
+                    .HasForeignKey(rolePermission => rolePermission.RoleId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                entity.HasOne(rolePermission => rolePermission.Permission)
+                    .WithMany(permission => permission.RolePermissions)
+                    .HasForeignKey(rolePermission => rolePermission.PermissionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(rolePermission => rolePermission.PermissionId);
             });
 
             modelBuilder.Entity<Todo>(entity =>
@@ -135,3 +190,4 @@ namespace BE_ZSM.Contexts
         }
     }
 }
+

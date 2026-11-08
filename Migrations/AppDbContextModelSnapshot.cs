@@ -58,7 +58,7 @@ namespace BE_ZSM.Migrations
                     b.ToTable("ExternalLogins");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.GameMode", b =>
+            modelBuilder.Entity("BE_ZSM.Entities.Permission", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -66,113 +66,37 @@ namespace BE_ZSM.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
+                    b.Property<string>("Code")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("GameModes");
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Permissions");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.Map", b =>
+            modelBuilder.Entity("BE_ZSM.Entities.Rbac.UserRole", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Rate")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Maps");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.Record", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<TimeSpan>("FinishTime")
-                        .HasColumnType("time");
-
-                    b.Property<int>("GameModeId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("MapId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("RejectReason")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("ReviewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ReviewedBy")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ThumbnailUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
-                    b.Property<int>("VehicleId")
+                    b.Property<int>("RoleId")
                         .HasColumnType("int");
 
-                    b.Property<string>("VideoUrl")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.HasKey("UserId", "RoleId");
 
-                    b.Property<int>("Views")
-                        .HasColumnType("int");
+                    b.HasIndex("RoleId");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("GameModeId");
-
-                    b.HasIndex("MapId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("VehicleId");
-
-                    b.ToTable("Records");
+                    b.ToTable("UserRoles");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.RefreshToken", b =>
@@ -215,10 +139,25 @@ namespace BE_ZSM.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("Name")
-                        .HasColumnType("int");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("NameNormalized")
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)")
+                        .HasComputedColumnSql("UPPER([Name])", true);
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("NameNormalized")
+                        .IsUnique();
 
                     b.ToTable("Roles");
 
@@ -227,14 +166,31 @@ namespace BE_ZSM.Migrations
                         {
                             Id = 2,
                             Description = "Administrator",
-                            Name = 1
+                            Name = "Admin",
+                            NameNormalized = "ADMIN"
                         },
                         new
                         {
                             Id = 1,
                             Description = "Regular User",
-                            Name = 0
+                            Name = "User",
+                            NameNormalized = "USER"
                         });
+                });
+
+            modelBuilder.Entity("BE_ZSM.Entities.RolePermission", b =>
+                {
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PermissionId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RoleId", "PermissionId");
+
+                    b.HasIndex("PermissionId");
+
+                    b.ToTable("RolePermissions");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.Todo", b =>
@@ -396,35 +352,6 @@ namespace BE_ZSM.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.Vehicle", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int?>("Rank")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("Vehicles");
-                });
-
             modelBuilder.Entity("BE_ZSM.Entities.ExternalLogin", b =>
                 {
                     b.HasOne("BE_ZSM.Entities.User", "User")
@@ -436,39 +363,23 @@ namespace BE_ZSM.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.Record", b =>
+            modelBuilder.Entity("BE_ZSM.Entities.Rbac.UserRole", b =>
                 {
-                    b.HasOne("BE_ZSM.Entities.GameMode", "GameMode")
-                        .WithMany("Records")
-                        .HasForeignKey("GameModeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("BE_ZSM.Entities.Map", "Map")
-                        .WithMany("Records")
-                        .HasForeignKey("MapId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                    b.HasOne("BE_ZSM.Entities.Role", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("BE_ZSM.Entities.User", "User")
-                        .WithMany("Records")
+                        .WithMany("UserRoles")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("BE_ZSM.Entities.Vehicle", "Vehicle")
-                        .WithMany("Records")
-                        .HasForeignKey("VehicleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("GameMode");
-
-                    b.Navigation("Map");
+                    b.Navigation("Role");
 
                     b.Navigation("User");
-
-                    b.Navigation("Vehicle");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.RefreshToken", b =>
@@ -480,6 +391,25 @@ namespace BE_ZSM.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BE_ZSM.Entities.RolePermission", b =>
+                {
+                    b.HasOne("BE_ZSM.Entities.Permission", "Permission")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("PermissionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BE_ZSM.Entities.Role", "Role")
+                        .WithMany("RolePermissions")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Permission");
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.Todo", b =>
@@ -533,18 +463,17 @@ namespace BE_ZSM.Migrations
                     b.Navigation("Role");
                 });
 
-            modelBuilder.Entity("BE_ZSM.Entities.GameMode", b =>
+            modelBuilder.Entity("BE_ZSM.Entities.Permission", b =>
                 {
-                    b.Navigation("Records");
-                });
-
-            modelBuilder.Entity("BE_ZSM.Entities.Map", b =>
-                {
-                    b.Navigation("Records");
+                    b.Navigation("RolePermissions");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.Role", b =>
                 {
+                    b.Navigation("RolePermissions");
+
+                    b.Navigation("UserRoles");
+
                     b.Navigation("Users");
                 });
 
@@ -562,18 +491,13 @@ namespace BE_ZSM.Migrations
                 {
                     b.Navigation("ExternalLogins");
 
-                    b.Navigation("Records");
-
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("TodoCategories");
 
                     b.Navigation("Todos");
-                });
 
-            modelBuilder.Entity("BE_ZSM.Entities.Vehicle", b =>
-                {
-                    b.Navigation("Records");
+                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

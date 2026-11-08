@@ -1,4 +1,5 @@
-﻿using BE_ZSM.DTOs.Todos;
+using BE_ZSM.DTOs.Todos;
+using BE_ZSM.Authorization;
 using BE_ZSM.Services.TodoService;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +20,7 @@ public class TodoController : ControllerBase
     }
 
     [HttpGet]
+    [HasPermission(PermissionCodes.TodoRead)]
     public async Task<IActionResult> GetTodos([FromQuery] TodoQueryDto query)
     {
         var userId = GetCurrentUserId();
@@ -27,6 +29,7 @@ public class TodoController : ControllerBase
     }
 
     [HttpPut("batch")]
+    [HasPermission(PermissionCodes.TodoWrite)]
     public async Task<IActionResult> SaveTodos([FromBody] List<SaveTodoDto> dtos)
     {
         await _todoService.SaveTodosAsync(dtos, GetCurrentUserId());
