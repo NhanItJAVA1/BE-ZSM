@@ -1,3 +1,5 @@
+using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using BE_ZSM.Authorization;
 using BE_ZSM.Contexts;
 using BE_ZSM.DTOs.Rbac;
@@ -5,7 +7,6 @@ using BE_ZSM.Entities;
 using BE_ZSM.Entities.Rbac;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Generic;
-using BE_ZSM.Services.Rbac;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,6 @@ namespace BE_ZSM.Services.Rbac;
 
 public sealed class RbacManagementService : IRbacManagementService
 {
-    // Effective administrator status requires both permissions, including grants from different roles.
     private static readonly string[] AdministratorPermissionCodes =
     [
         PermissionCodes.RolesManagePermissions,
@@ -27,11 +27,13 @@ public sealed class RbacManagementService : IRbacManagementService
     private readonly IGenericRepository<RolePermission> _rolePermissionRepository;
     private readonly IGenericRepository<User> _userRepository;
     private readonly IGenericRepository<UserRole> _userRoleRepository;
+    private readonly IMapper _mapper;
 
-    public RbacManagementService(AppDbContext dbContext, IUnitOfWork unitOfWork)
+    public RbacManagementService(AppDbContext dbContext, IUnitOfWork unitOfWork, IMapper mapper)
     {
         _dbContext = dbContext;
         _unitOfWork = unitOfWork;
+        _mapper = mapper;
         _roleRepository = unitOfWork.GetRepository<Role>();
         _permissionRepository = unitOfWork.GetRepository<Permission>();
         _rolePermissionRepository = unitOfWork.GetRepository<RolePermission>();
@@ -40,7 +42,6 @@ public sealed class RbacManagementService : IRbacManagementService
     }
 
     // Role management
-
     public async Task<IReadOnlyList<RoleResponseDto>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         return await _roleRepository.All().AsNoTracking()
@@ -51,24 +52,21 @@ public sealed class RbacManagementService : IRbacManagementService
 
     public async Task<RoleResponseDto> CreateRoleAsync(SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
-        var name = NormalizeName(dto.Name);
-        var description = NormalizeDescription(dto.Description);
+        var name = dto.Name!.Trim();
+        var description = dto.Description?.Trim() ?? string.Empty;
 
-        await EnsureRoleNameAvailableAsync(name, null, cancellationToken);
-
-        // Role IDs are configured ValueGeneratedNever, so retain the existing MAX(Id) + 1 behavior.
         var nextId = checked((await _roleRepository.All().MaxAsync(role => (int?)role.Id, cancellationToken) ?? 0) + 1);
         var role = new Role { Id = nextId, Name = name, Description = description };
         await _roleRepository.CreateAsync(role);
         await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
 
-        return ToRoleDto(role);
+        return _mapper.Map<RoleResponseDto>(role);
     }
 
     public async Task<RoleResponseDto> UpdateRoleAsync(int id, SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
-        var name = NormalizeName(dto.Name);
-        var description = NormalizeDescription(dto.Description);
+        var name = dto.Name!.Trim();
+        var description = dto.Description?.Trim() ?? string.Empty;
 
         var role = await _roleRepository.FindAsync(item => item.Id == id);
         if (role == null)
@@ -77,12 +75,11 @@ public sealed class RbacManagementService : IRbacManagementService
         if (IsDefaultRole(role) && !string.Equals(role.Name, name, StringComparison.Ordinal))
             throw new ConflictException("The default User and Admin role names cannot be changed", "DEFAULT_ROLE_NAME_IMMUTABLE");
 
-        await EnsureRoleNameAvailableAsync(name, id, cancellationToken);
         role.Name = name;
         role.Description = description;
         await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
 
-        return ToRoleDto(role);
+        return _mapper.Map<RoleResponseDto>(role);
     }
 
     public async Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
@@ -110,7 +107,7 @@ public sealed class RbacManagementService : IRbacManagementService
     {
         return await _permissionRepository.All().AsNoTracking()
             .OrderBy(permission => permission.Code)
-            .Select(ToPermissionProjection())
+            .ProjectTo<PermissionResponseDto>(_mapper.ConfigurationProvider)
             .ToListAsync(cancellationToken);
     }
 
@@ -123,16 +120,14 @@ public sealed class RbacManagementService : IRbacManagementService
             .Where(item => item.RoleId == roleId)
             .Select(item => item.Permission)
             .OrderBy(permission => permission.Code)
-            .Select(ToPermissionProjection())
+            .ProjectTo<PermissionResponseDto>(_mapper.ConfigurationProvider)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<PermissionResponseDto>> ReplaceRolePermissionsAsync(
-        int roleId,
-        ReplaceRolePermissionsDto dto,
+    public async Task<IReadOnlyList<PermissionResponseDto>> ReplaceRolePermissionsAsync(int roleId, ReplaceRolePermissionsDto dto,
         CancellationToken cancellationToken = default)
     {
-        var permissionIds = ValidateDistinctIds(dto.PermissionIds, "PermissionIds");
+        var permissionIds = dto.PermissionIds;
 
         var role = await _roleRepository.FindAsync(item => item.Id == roleId);
         if (role == null)
@@ -166,11 +161,10 @@ public sealed class RbacManagementService : IRbacManagementService
             "ROLE_PERMISSION_CONCURRENCY_CONFLICT",
             "Role permissions changed concurrently");
 
-        return permissions.OrderBy(permission => permission.Code).Select(ToPermissionDto).ToList();
+        return permissions.OrderBy(permission => permission.Code).Select(_mapper.Map<PermissionResponseDto>).ToList();
     }
 
     // User role management
-
     public async Task<IReadOnlyList<RoleResponseDto>> GetUserRolesAsync(int userId, CancellationToken cancellationToken = default)
     {
         if (!await _userRepository.All().AnyAsync(user => user.Id == userId, cancellationToken))
@@ -184,70 +178,50 @@ public sealed class RbacManagementService : IRbacManagementService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<RoleResponseDto>> ReplaceUserRolesAsync(
-        int userId,
-        ReplaceUserRolesDto dto,
-        CancellationToken cancellationToken = default)
+
+    public async Task<IReadOnlyList<RoleResponseDto>> ReplaceUserRolesAsync(int userId, ReplaceUserRolesDto dto, CancellationToken cancellationToken = default)
     {
-        var roleIds = ValidateDistinctIds(dto.RoleIds, "RoleIds");
-        if (roleIds.Count == 0)
-            throw new BadRequestException("A user must have at least one role", "USER_ROLE_REQUIRED");
+        var roleIds = dto.RoleIds;
 
-        var user = await _userRepository.Where(item => item.Id == userId)
-            .Include(item => item.UserRoles)
-            .FirstOrDefaultAsync(cancellationToken);
-        if (user == null)
-            throw new NotFoundException("User not found", "USER_NOT_FOUND");
+        var user = await _userRepository.Where(u => u.Id == userId)
+            .Include(u => u.UserRoles)
+            .FirstOrDefaultAsync(cancellationToken) ?? throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
-        var roles = await _roleRepository.Where(role => roleIds.Contains(role.Id))
+        var roles = await _roleRepository.Where(r => roleIds.Contains(r.Id))
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
+
         if (roles.Count != roleIds.Count)
             throw new BadRequestException("One or more role IDs do not exist", "ROLE_ID_INVALID");
 
-        var currentAdministratorIds = await GetAdministratorUserIdsAsync(cancellationToken);
-        if (currentAdministratorIds.Count == 1
-            && currentAdministratorIds[0] == userId
-            && !await RoleIdsGrantAdministratorPermissionsAsync(roleIds, cancellationToken))
-        {
+        var adminIds = await GetUsersWithRbacAdminPermissionsAsync(cancellationToken);
+
+        if (adminIds.Count == 1 && adminIds[0] == userId && !await RoleIdsGrantAdministratorPermissionsAsync(roleIds, cancellationToken))
             throw new ConflictException("The last RBAC administrator cannot lose both management permissions", "LAST_ADMIN_PROTECTED");
-        }
 
-        var currentRoleIds = user.UserRoles.Select(item => item.RoleId).ToHashSet();
-        var requestedRoleIds = roleIds.ToHashSet();
-        var rolesToRemove = user.UserRoles.Where(item => !requestedRoleIds.Contains(item.RoleId)).ToList();
-        _userRoleRepository.DeleteRangeAsync(rolesToRemove);
+        var currentIds = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
+        var requestedIds = roleIds.ToHashSet();
 
-        var rolesToAdd = roles.Where(role => !currentRoleIds.Contains(role.Id)).ToList();
-        await _userRoleRepository.CreateRangeAsync(rolesToAdd.Select(role => new UserRole
-        {
-            UserId = userId,
-            RoleId = role.Id
-        }));
+        _userRoleRepository.DeleteRangeAsync(user.UserRoles.Where(ur => !requestedIds.Contains(ur.RoleId)).ToList());
 
-        var legacyRole = roles.FirstOrDefault(role => role.Id == user.RoleId)
-            ?? roles.FirstOrDefault(role => role.Name == "User")
-            ?? roles.OrderBy(role => role.Id).First();
-        user.RoleId = legacyRole.Id;
+        await _userRoleRepository.CreateRangeAsync(roles.Where(r => !currentIds.Contains(r.Id))
+                .Select(r => new UserRole
+                {
+                    UserId = userId,
+                    RoleId = r.Id
+                }));
 
-        await SaveChangesWithConflictHandlingAsync(
-            "USER_ROLE_CONCURRENCY_CONFLICT",
-            "User roles changed concurrently");
+        user.RoleId = roles.FirstOrDefault(r => r.Id == user.RoleId)?.Id 
+            ?? roles.FirstOrDefault(r => r.Name == "User")?.Id 
+            ?? roles.Min(r => r.Id);
 
-        return roles.OrderBy(role => role.Name).Select(ToRoleDto).ToList();
+        await SaveChangesWithConflictHandlingAsync("USER_ROLE_CONCURRENCY_CONFLICT", "User roles changed concurrently");
+
+        return _mapper.Map<List<RoleResponseDto>>(roles.OrderBy(r => r.Name).ToList());
     }
 
-    // Business rules
 
-    private async Task EnsureRoleNameAvailableAsync(string name, int? exceptId, CancellationToken cancellationToken)
-    {
-        var normalized = name.ToUpperInvariant();
-        var exists = await _roleRepository.All().AnyAsync(role =>
-            role.NameNormalized == normalized && (!exceptId.HasValue || role.Id != exceptId.Value), cancellationToken);
-        if (exists)
-            throw new ConflictException("A role with this name already exists", "ROLE_NAME_ALREADY_EXISTS");
-    }
-
-    private async Task<List<int>> GetAdministratorUserIdsAsync(CancellationToken cancellationToken)
+    private async Task<List<int>> GetUsersWithRbacAdminPermissionsAsync(CancellationToken cancellationToken)
     {
         return await _userRepository.All().AsNoTracking()
             .Where(user => user.UserRoles.Any(userRole => userRole.Role.RolePermissions
@@ -263,7 +237,7 @@ public sealed class RbacManagementService : IRbacManagementService
         IReadOnlyCollection<Permission> replacementPermissions,
         CancellationToken cancellationToken)
     {
-        var currentAdministratorIds = await GetAdministratorUserIdsAsync(cancellationToken);
+        var currentAdministratorIds = await GetUsersWithRbacAdminPermissionsAsync(cancellationToken);
         if (currentAdministratorIds.Count == 0)
             return;
 
@@ -285,9 +259,7 @@ public sealed class RbacManagementService : IRbacManagementService
         if (hasAffectedAdministrator)
             return;
 
-        throw new ConflictException(
-            "At least one RBAC administrator must retain both management permissions",
-            "LAST_ADMIN_PROTECTED");
+        throw new ConflictException("At least one RBAC administrator must retain both management permissions", "LAST_ADMIN_PROTECTED");
     }
 
     private async Task<bool> HasAdministratorAfterPermissionChangeAsync(
@@ -370,57 +342,7 @@ public sealed class RbacManagementService : IRbacManagementService
         return false;
     }
 
-    // DTO validation and mapping
-
-    private static List<int> ValidateDistinctIds(List<int> ids, string fieldName)
-    {
-        if (ids == null || ids.Any(id => id <= 0))
-            throw new BadRequestException($"{fieldName} must contain positive IDs", "RBAC_IDS_INVALID");
-        if (ids.Count != ids.Distinct().Count())
-            throw new BadRequestException($"{fieldName} must not contain duplicates", "RBAC_IDS_DUPLICATE");
-        return ids;
-    }
-
-    private static string NormalizeName(string? name)
-    {
-        var normalized = name?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-            throw new BadRequestException("Role name is required", "ROLE_NAME_REQUIRED");
-        if (normalized.Length > 50)
-            throw new BadRequestException("Role name cannot exceed 50 characters", "ROLE_NAME_TOO_LONG");
-        return normalized;
-    }
-
-    private static string NormalizeDescription(string? description)
-    {
-        var normalized = description?.Trim() ?? string.Empty;
-        if (normalized.Length > 500)
-            throw new BadRequestException("Role description cannot exceed 500 characters", "ROLE_DESCRIPTION_TOO_LONG");
-        return normalized;
-    }
-
     private static bool IsDefaultRole(Role role) => role.Id is 1 or 2
         || role.NameNormalized is "USER" or "ADMIN";
 
-    private static RoleResponseDto ToRoleDto(Role role) => new()
-    {
-        Id = role.Id,
-        Name = role.Name,
-        Description = role.Description
-    };
-
-    private static PermissionResponseDto ToPermissionDto(Permission permission) => new()
-    {
-        Id = permission.Id,
-        Code = permission.Code,
-        Description = permission.Description
-    };
-
-    private static System.Linq.Expressions.Expression<Func<Permission, PermissionResponseDto>> ToPermissionProjection() =>
-        permission => new PermissionResponseDto
-        {
-            Id = permission.Id,
-            Code = permission.Code,
-            Description = permission.Description
-        };
 }

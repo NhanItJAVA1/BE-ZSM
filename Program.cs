@@ -1,7 +1,8 @@
 using Amazon.Runtime;
 using Amazon.S3;
-using BE_ZSM.Contexts;
 using BE_ZSM.Authorization;
+using BE_ZSM.Contexts;
+using BE_ZSM.Filters;
 using BE_ZSM.Helpers;
 using BE_ZSM.Middlewares;
 using BE_ZSM.Repositories.Generic;
@@ -14,9 +15,11 @@ using BE_ZSM.Services.Interfaces;
 using BE_ZSM.Services.Provider;
 using BE_ZSM.Services.Rbac;
 using BE_ZSM.Services.TodoService;
+using BE_ZSM.Validators.Rbac;
 using DotNetEnv;
-using Microsoft.AspNetCore.Authorization;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -115,7 +118,13 @@ public partial class Program
         builder.Services.AddScoped<ICacheService, CacheService>();
         builder.Services.AddAutoMapper(cfg => { }, typeof(MappingProfile));
         builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
-
+        builder.Services.AddValidatorsFromAssemblyContaining<SaveRoleDtoValidator>();
+        builder.Services.AddValidatorsFromAssemblyContaining<ReplaceRolePermissionsDtoValidator>();
+        builder.Services.AddValidatorsFromAssemblyContaining<ReplaceUserRolesDtoValidator>();
+        builder.Services.AddControllers(options =>
+        {
+            options.Filters.Add<ValidationActionFilter>();
+        });
         builder.Services.AddSingleton<IAmazonS3>(_ =>
             new AmazonS3Client(
                 new BasicAWSCredentials(

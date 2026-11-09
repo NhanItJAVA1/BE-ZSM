@@ -1,4 +1,5 @@
 using AutoMapper;
+using BE_ZSM.DTOs.Rbac;
 using BE_ZSM.DTOs.Todos;
 using BE_ZSM.DTOs.Todos.Categories;
 using BE_ZSM.DTOs.Users;
@@ -63,6 +64,9 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Todos, opt => opt.Ignore());
 
         CreateMap<TodoActivity, TodoActivityDto>();
+
+        CreateMap<Role, RoleResponseDto>();
+        CreateMap<Permission, PermissionResponseDto>();
     }
 }
 

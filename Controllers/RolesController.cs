@@ -10,8 +10,10 @@ namespace BE_ZSM.Controllers;
 public sealed class RolesController : ControllerBase
 {
     private readonly IRbacManagementService _rbacService;
-
-    public RolesController(IRbacManagementService rbacService) => _rbacService = rbacService;
+    public RolesController(IRbacManagementService rbacService)
+    {
+        _rbacService = rbacService;
+    }
 
     [HttpGet]
     [HasPermission(PermissionCodes.RolesRead)]
@@ -23,13 +25,15 @@ public sealed class RolesController : ControllerBase
     public async Task<IActionResult> CreateRole([FromBody] SaveRoleDto dto, CancellationToken cancellationToken)
     {
         var role = await _rbacService.CreateRoleAsync(dto, cancellationToken);
-        return CreatedAtAction(nameof(GetRoles), role);
+        return StatusCode(StatusCodes.Status201Created, role);
     }
 
     [HttpPut("{id:int}")]
     [HasPermission(PermissionCodes.RolesUpdate)]
-    public async Task<IActionResult> UpdateRole(int id, [FromBody] SaveRoleDto dto, CancellationToken cancellationToken) =>
-        Ok(await _rbacService.UpdateRoleAsync(id, dto, cancellationToken));
+    public async Task<IActionResult> UpdateRole(int id, [FromBody] SaveRoleDto dto, CancellationToken cancellationToken)
+    {
+        return Ok(await _rbacService.UpdateRoleAsync(id, dto, cancellationToken));
+    }
 
     [HttpDelete("{id:int}")]
     [HasPermission(PermissionCodes.RolesDelete)]
@@ -46,9 +50,8 @@ public sealed class RolesController : ControllerBase
 
     [HttpPut("{id:int}/permissions")]
     [HasPermission(PermissionCodes.RolesManagePermissions)]
-    public async Task<IActionResult> ReplaceRolePermissions(
-        int id,
-        [FromBody] ReplaceRolePermissionsDto dto,
-        CancellationToken cancellationToken) =>
-        Ok(await _rbacService.ReplaceRolePermissionsAsync(id, dto, cancellationToken));
+    public async Task<IActionResult> ReplaceRolePermissions(int id, [FromBody] ReplaceRolePermissionsDto dto, CancellationToken cancellationToken)
+    {
+        return Ok(await _rbacService.ReplaceRolePermissionsAsync(id, dto, cancellationToken));
+    }
 }

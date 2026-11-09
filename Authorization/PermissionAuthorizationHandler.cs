@@ -19,13 +19,8 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 
     protected override async Task HandleRequirementAsync(AuthorizationHandlerContext context, PermissionRequirement requirement)
     {
-        if (!PermissionCodes.All.Contains(requirement.Code)
-            || context.User.Identity?.IsAuthenticated != true
-            || !int.TryParse(
-                context.User.FindFirstValue(ClaimTypes.NameIdentifier),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out var userId)
+        if (!PermissionCodes.All.Contains(requirement.Code) || context.User.Identity?.IsAuthenticated != true
+            || !int.TryParse(context.User.FindFirstValue(ClaimTypes.NameIdentifier), NumberStyles.None, CultureInfo.InvariantCulture, out var userId)
             || userId <= 0)
         {
             return;
@@ -34,9 +29,8 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         var cancellationToken = _httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None;
         var hasPermission = await _dbContext.Users
             .AsNoTracking()
-            .AnyAsync(user => user.Id == userId
-                && user.UserRoles.Any(userRole => userRole.Role.RolePermissions
-                    .Any(rolePermission => rolePermission.Permission.Code == requirement.Code)), cancellationToken);
+            .AnyAsync(user => user.Id == userId && user.UserRoles.Any(userRole => userRole.Role.RolePermissions
+            .Any(rolePermission => rolePermission.Permission.Code == requirement.Code)), cancellationToken);
 
         if (hasPermission)
             context.Succeed(requirement);
