@@ -22,6 +22,8 @@
 
         public DateTime UpdatedAt { get; set; }
 
+        public bool IsSystemOwner { get; set; } = false;
+
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public ICollection<Todo> Todos { get; set; } = [];
         public ICollection<TodoCategory> TodoCategories { get; set; } = [];

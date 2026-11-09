@@ -1,4 +1,6 @@
 using AutoMapper;
+using Azure;
+using BE_ZSM.Contexts;
 using BE_ZSM.DTOs.Auth;
 using BE_ZSM.DTOs.Users;
 using BE_ZSM.Entities;
@@ -18,13 +20,14 @@ public class AuthService : IAuthService
     private readonly IUnitOfWork _unitOfWork;
     private readonly JwtService _jwtService;
     private readonly IMapper _mapper;
-
+    private readonly AppDbContext _dbContext;
     private readonly IGenericRepository<User> _userRepo;
     private readonly IGenericRepository<Role> _roleRepo;
     private readonly IGenericRepository<RefreshToken> _refreshTokenRepo;
     private readonly IGenericRepository<ExternalLoginEntity> _externalLoginRepo;
 
     public AuthService(
+    AppDbContext dbContext,
     IEnumerable<IExternalAuthProvider> providers,
     IUnitOfWork unitOfWork,
     JwtService jwtService,
@@ -34,7 +37,7 @@ public class AuthService : IAuthService
         _unitOfWork = unitOfWork;
         _jwtService = jwtService;
         _mapper = mapper;
-
+        _dbContext = dbContext;
         _userRepo = unitOfWork.GetRepository<User>();
         _roleRepo = unitOfWork.GetRepository<Role>();
         _refreshTokenRepo = unitOfWork.GetRepository<RefreshToken>();
@@ -68,8 +71,19 @@ public class AuthService : IAuthService
 
         if (user == null || !IsPasswordValid(dto.Password, user.PasswordHash))
             throw new UnauthorizedException("Invalid username or password", "INVALID_CREDENTIALS");
+        var permissions = await _dbContext.UserRoles
+           .AsNoTracking()
+           .Where(ur => ur.UserId == user.Id)
+           .SelectMany(ur => ur.Role.RolePermissions)
+           .Select(rp => rp.Permission.Code)
+           .Distinct()
+           .ToListAsync();
 
-        return await CreateLoginSessionAsync(user);
+        var response = await CreateLoginSessionAsync(user);
+        response.Permissions = permissions;
+        response.IsSystemOwner = user.IsSystemOwner;
+
+        return response;
     }
 
     public async Task<LoginResponseDto> ExternalLoginAsync(ExternalLoginDto dto)
@@ -94,11 +108,15 @@ public class AuthService : IAuthService
         if (!IsRefreshTokenActive(refreshToken))
             throw new UnauthorizedException("Invalid or expired refresh token", "INVALID_REFRESH_TOKEN");
 
+        var user = refreshToken!.User;
+        var userResponse = _mapper.Map<UserResponseDto>(user);
+        userResponse.Permissions = await GetUserPermissionCodesAsync(user.Id);
+
         return new LoginResponseDto
         {
-            AccessToken = CreateAccessToken(refreshToken!.User),
+            AccessToken = CreateAccessToken(user),
             RefreshToken = refreshToken.Token,
-            User = _mapper.Map<UserResponseDto>(refreshToken.User)
+            User = userResponse
         };
     }
 
@@ -227,12 +245,28 @@ public class AuthService : IAuthService
         await _refreshTokenRepo.CreateAsync(refreshTokenEntity);
         await _unitOfWork.SaveChangesAsync();
 
+        var userResponse = _mapper.Map<UserResponseDto>(user);
+        userResponse.Permissions = await GetUserPermissionCodesAsync(user.Id);
+
         return new LoginResponseDto
         {
             AccessToken = CreateAccessToken(user),
             RefreshToken = refreshToken,
-            User = _mapper.Map<UserResponseDto>(user)
+            User = userResponse
         };
+    }
+
+    private async Task<List<string>> GetUserPermissionCodesAsync(int userId)
+    {
+        return await _userRepo.All()
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .SelectMany(user => user.UserRoles)
+            .SelectMany(userRole => userRole.Role.RolePermissions)
+            .Select(rolePermission => rolePermission.Permission.Code)
+            .Distinct()
+            .OrderBy(code => code)
+            .ToListAsync();
     }
 
     private string CreateAccessToken(User user)

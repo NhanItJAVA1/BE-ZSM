@@ -35,7 +35,10 @@ public class UserService : IUserService
     {
         var users = await _userRepo.All()
             .Include(u => u.Role)
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(u => u.UserRoles)
+                .ThenInclude(userRole => userRole.Role)
+                    .ThenInclude(role => role.RolePermissions)
+                        .ThenInclude(rolePermission => rolePermission.Permission)
             .AsNoTracking()
             .ToListAsync();
 
@@ -50,10 +53,21 @@ public class UserService : IUserService
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
+        var permissions = await _dbContext.UserRoles
+            .AsNoTracking()
+            .Where(ur => ur.UserId == id)
+            .SelectMany(ur => ur.Role.RolePermissions)
+            .Select(rp => rp.Permission.Code)
+            .Distinct()
+            .ToListAsync();
+
         if (user == null)
             throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
-        return _mapper.Map<UserResponseDto>(user);
+        var response = _mapper.Map<UserResponseDto>(user);
+        response.Permissions = permissions;
+
+        return response;
     }
 
     public async Task UpdateAsync(int id, UpdateUserDto dto)

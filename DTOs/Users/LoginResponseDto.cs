@@ -8,6 +8,8 @@ namespace BE_ZSM.DTOs.Users
 
         public string RefreshToken { get; set; } = string.Empty;
 
+        public bool IsSystemOwner { get; set; }
+        public List<string> Permissions { get; set; } = [];        
         public UserResponseDto User { get; set; } = null!;
     }
 }

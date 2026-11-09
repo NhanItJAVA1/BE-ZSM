@@ -89,6 +89,32 @@ public sealed class AuthServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoginAndRefresh_ReturnEffectivePermissionsAcrossRoles()
+    {
+        await SeedLocalUserAsync();
+        _db.Roles.Add(new Role { Id = 2, Name = "Extra", Description = "Extra role" });
+        _db.UserRoles.Add(new BE_ZSM.Entities.Rbac.UserRole { UserId = 1, RoleId = 2 });
+        _db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = 1,
+            Permission = new Permission { Code = "roles.manage-permissions" }
+        });
+        _db.RolePermissions.Add(new RolePermission
+        {
+            RoleId = 2,
+            Permission = new Permission { Code = "users.manage-roles" }
+        });
+        await _db.SaveChangesAsync();
+
+        var login = await LoginLocalUserAsync();
+        var refresh = await _service.RefreshTokenAsync(login.RefreshToken);
+
+        Assert.Contains("roles.manage-permissions", login.User.Permissions);
+        Assert.Contains("users.manage-roles", login.User.Permissions);
+        Assert.Equal(login.User.Permissions, refresh.User.Permissions);
+    }
+
+    [Fact]
     public async Task Register_CreatesDefaultUserRoleWithoutClientRoleInput()
     {
         await _service.RegisterAsync(new RegisterUserDto
@@ -136,8 +162,30 @@ public sealed class AuthServiceTests : IDisposable
             Role = new Role { Id = 1, Name = "User" },
             UserRoles =
             [
-                new BE_ZSM.Entities.Rbac.UserRole { Role = new Role { Id = 2, Name = "Admin" } },
-                new BE_ZSM.Entities.Rbac.UserRole { Role = new Role { Id = 1, Name = "User" } }
+                new BE_ZSM.Entities.Rbac.UserRole
+                {
+                    Role = new Role
+                    {
+                        Id = 2,
+                        Name = "Admin",
+                        RolePermissions =
+                        [
+                            new RolePermission { Permission = new Permission { Code = "roles.create" } }
+                        ]
+                    }
+                },
+                new BE_ZSM.Entities.Rbac.UserRole
+                {
+                    Role = new Role
+                    {
+                        Id = 1,
+                        Name = "User",
+                        RolePermissions =
+                        [
+                            new RolePermission { Permission = new Permission { Code = "todo.read" } }
+                        ]
+                    }
+                }
             ]
         };
 
@@ -145,6 +193,7 @@ public sealed class AuthServiceTests : IDisposable
 
         Assert.Equal("User", response.Role);
         Assert.Equal(new[] { "Admin", "User" }, response.Roles);
+        Assert.Equal(new[] { "roles.create", "todo.read" }, response.Permissions);
     }
 
     [Fact]

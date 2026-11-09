@@ -326,6 +326,9 @@ namespace BE_ZSM.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
+                    b.Property<bool>("IsSystemOwner")
+                        .HasColumnType("bit");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -343,6 +346,10 @@ namespace BE_ZSM.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("IsSystemOwner")
+                        .IsUnique()
+                        .HasFilter("[IsSystemOwner] = 1");
 
                     b.HasIndex("RoleId");
 

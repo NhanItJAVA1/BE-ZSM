@@ -1,12 +1,14 @@
-using BE_ZSM.DTOs.Users;
 using BE_ZSM.Authorization;
+using BE_ZSM.DTOs.Users;
 using BE_ZSM.Services.Interfaces;
 using BE_ZSM.Services.Rbac;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BE_ZSM.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 [HasPermission(PermissionCodes.UsersManageRoles)]
 public class UsersController : ControllerBase

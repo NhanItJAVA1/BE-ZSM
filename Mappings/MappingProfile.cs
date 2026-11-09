@@ -18,7 +18,12 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Roles, opt => opt.MapFrom(src => src.UserRoles
                 .Select(ur => ur.Role.Name)
                 .Distinct()
-                .OrderBy(name => name)));
+                .OrderBy(name => name)))
+            .ForMember(dest => dest.Permissions, opt => opt.MapFrom(src => src.UserRoles
+                .SelectMany(userRole => userRole.Role.RolePermissions)
+                .Select(rolePermission => rolePermission.Permission.Code)
+                .Distinct()
+                .OrderBy(code => code)));
 
         CreateMap<Todo, TodoDto>()
            .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))

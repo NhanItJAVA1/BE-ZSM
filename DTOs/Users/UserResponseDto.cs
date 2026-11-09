@@ -21,4 +21,8 @@ public class UserResponseDto
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public bool IsSystemOwner { get; set; }
+
+    public List<string> Permissions { get; set; } = [];
 }
