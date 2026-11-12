@@ -125,9 +125,6 @@ public sealed class RbacManagementService : IRbacManagementService
 
         if (permissions.Count != permissionIds.Count)
             throw new BadRequestException("One or more permission IDs do not exist", "PERMISSION_ID_INVALID");
-        else if (role.NameNormalized == "USER" && permissions.Any(permission => PermissionCodes.RbacManagement.Contains(permission.Code)))
-            throw new ConflictException("RBAC management permissions cannot be assigned to the default User role", "USER_ROLE_ADMIN_PERMISSION_FORBIDDEN");
-
 
         var currentAssignments = await _rolePermissionRepository.Where(item => item.RoleId == roleId)
             .Include(item => item.Permission)
@@ -165,7 +162,6 @@ public sealed class RbacManagementService : IRbacManagementService
             .Select(role => new RoleResponseDto { Id = role.Id, Name = role.Name, Description = role.Description })
             .ToListAsync(cancellationToken);
     }
-
 
     public async Task<IReadOnlyList<RoleResponseDto>> ReplaceUserRolesAsync(int userId, ReplaceUserRolesDto dto, CancellationToken cancellationToken = default)
     {
