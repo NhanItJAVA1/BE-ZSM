@@ -11,6 +11,7 @@ namespace BE_ZSM.Extensions
             page = page < 1 ? 1 : page;
             pageSize = pageSize < 1 ? 10 : pageSize;
             if (pageSize > 100) pageSize = 100;
+            page = (int)Math.Min(page, (int.MaxValue / pageSize) + 1L);
 
             var totalItems = await query.CountAsync();
 
@@ -34,6 +35,7 @@ namespace BE_ZSM.Extensions
             pageSize = pageSize < 1 ? 10 : pageSize;
 
             if (pageSize > 100) pageSize = 100;
+            page = (int)Math.Min(page, (int.MaxValue / pageSize) + 1L);
 
             var totalItems = await query.CountAsync();
 

@@ -4,6 +4,7 @@ public static class PermissionCodes
 {
     public const string TodoRead = "todo.read";
     public const string TodoWrite = "todo.write";
+    public const string TodosReadAll = "todos.read-all";
     public const string TodoCategoryRead = "todo-category.read";
     public const string TodoCategoryCreate = "todo-category.create";
     public const string TodoCategoryUpdate = "todo-category.update";
@@ -24,6 +25,7 @@ public static class PermissionCodes
     {
         TodoRead,
         TodoWrite,
+        TodosReadAll,
         TodoCategoryRead,
         TodoCategoryCreate,
         TodoCategoryUpdate,
@@ -50,5 +52,13 @@ public static class PermissionCodes
         RolesManagePermissions,
         UsersManageRoles,
         PermissionsRead
+    };
+
+    public static IReadOnlySet<string> AdminRecoveryPermissions { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        RolesRead,
+        PermissionsRead,
+        RolesManagePermissions,
+        UsersManageRoles
     };
 }

@@ -10,7 +10,6 @@ namespace BE_ZSM.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-[HasPermission(PermissionCodes.UsersManageRoles)]
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;

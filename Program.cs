@@ -9,6 +9,7 @@ using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Repositories.UnitOfWork;
 using BE_ZSM.Services;
 using BE_ZSM.Services.Auth;
+using BE_ZSM.Services.AdminRecovery;
 using BE_ZSM.Services.Cache;
 using BE_ZSM.Services.Category;
 using BE_ZSM.Services.Interfaces;
@@ -109,6 +110,7 @@ public partial class Program
         builder.Services.AddScoped<IAuthService, AuthService>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<IRbacManagementService, RbacManagementService>();
+        builder.Services.AddScoped<IAdminRecoveryService, AdminRecoveryService>();
         builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
         builder.Services.AddScoped<ITodoService, TodoService>();
         builder.Services.AddScoped<ITodoCategoryService, TodoCategoryService>();

@@ -28,11 +28,13 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 
         var cancellationToken = _httpContextAccessor.HttpContext?.RequestAborted ?? CancellationToken.None;
         var hasPermission = await _dbContext.Users
-            .AsNoTracking()
-            .AnyAsync(user => user.Id == userId && (user.IsSystemOwner || user.UserRoles.Any(userRole => userRole.Role.RolePermissions
-            .Any(rolePermission => rolePermission.Permission.Code == requirement.Code))), cancellationToken);
+             .AsNoTracking()
+             .AnyAsync(user => user.Id == userId && !user.IsSystemOwner && user.UserRoles
+             .Any(userRole => userRole.Role.RolePermissions
+             .Any(rolePermission => rolePermission.Permission.Code == requirement.Code)), cancellationToken);
 
         if (hasPermission)
             context.Succeed(requirement);
     }
+
 }

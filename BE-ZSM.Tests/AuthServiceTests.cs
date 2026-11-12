@@ -62,6 +62,7 @@ public sealed class AuthServiceTests : IDisposable
             });
 
         _service = new AuthService(
+            _db,
             [_googleProvider],
             new UnitOfWork(_db),
             new JwtService(),

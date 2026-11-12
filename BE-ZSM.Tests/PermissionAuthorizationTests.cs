@@ -25,7 +25,7 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
     {
         using var client = _factory.CreateClient();
 
-        var response = await client.GetAsync("/api/todos");
+        var response = await client.GetAsync("/api/todos/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -42,7 +42,7 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
         await db.SaveChangesAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        var response = await client.GetAsync("/api/todos");
+        var response = await client.GetAsync("/api/todos/me");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -56,7 +56,7 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
         await db.SaveChangesAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        var response = await client.GetAsync("/api/todos");
+        var response = await client.GetAsync("/api/todos/me");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -80,7 +80,7 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
     {
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        var response = await client.GetAsync("/api/todos");
+        var response = await client.GetAsync("/api/todos/me");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -100,7 +100,7 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
         await db.SaveChangesAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        var response = await client.GetAsync("/api/todos");
+        var response = await client.GetAsync("/api/todos/me");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -119,12 +119,12 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
         await db.SaveChangesAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/todos")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/todos/me")).StatusCode);
 
         db.UserRoles.Remove(await db.UserRoles.SingleAsync(x => x.UserId == TestUsers.UserAId && x.RoleId == 3));
         await db.SaveChangesAsync();
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/todos")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/todos/me")).StatusCode);
     }
 
     [Fact]
@@ -136,12 +136,12 @@ public sealed class PermissionAuthorizationTests : IAsyncLifetime, IDisposable
             .Select(x => x.Id).SingleAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/todos")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/todos/me")).StatusCode);
 
         db.RolePermissions.Remove(await db.RolePermissions.SingleAsync(x => x.RoleId == 1 && x.PermissionId == permissionId));
         await db.SaveChangesAsync();
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/todos")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/todos/me")).StatusCode);
     }
 
     [Fact]

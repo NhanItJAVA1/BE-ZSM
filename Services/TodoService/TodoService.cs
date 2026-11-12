@@ -16,52 +16,93 @@ namespace BE_ZSM.Services.TodoService
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGenericRepository<Todo> _todoRepo;
         private readonly IGenericRepository<TodoCategory> _categoryRepo;
+        private readonly IGenericRepository<User> _userRepo;
         public TodoService(IMapper mapper, IUnitOfWork unitOfWork)
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _todoRepo = _unitOfWork.GetRepository<Todo>();
             _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
+            _userRepo = _unitOfWork.GetRepository<User>();
         }
 
-        // GET ALL/FILTER/SORT/SEARCH TODOS
+        // GET OWN TODOS/FILTER/SORT/SEARCH TODOS
         public async Task<PagedResult<TodoDto>> GetTodosAsync(int userId, TodoQueryDto queryDto)
         {
-            var query = _todoRepo
-                        .All()
-                        .AsNoTracking()
-                        .Include(t => t.Category)
-                        .Where(t => t.UserId == userId);
+            return await GetTodosAsync(queryDto, userId);
+        }
+
+        public async Task<PagedResult<TodoDto>> GetTodosForUserAsync(int userId, TodoQueryDto queryDto)
+        {
+            if (!await _userRepo.All().AsNoTracking().AnyAsync(user => user.Id == userId))
+                throw new NotFoundException("User not found", "USER_NOT_FOUND");
+
+            return await GetTodosAsync(queryDto, userId);
+        }
+
+        public async Task<PagedResult<TodoDto>> GetAllTodosAsync(TodoQueryDto queryDto)
+        {
+            return await GetTodosAsync(queryDto, null);
+        }
+
+        public async Task<PagedResult<TodoUserSummaryDto>> GetUserTodoSummaryAsync(string? search, int page, int pageSize)
+        {
+            var users = _userRepo.All().AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var keyword = search.Trim();
+                users = users.Where(user => user.DisplayName.Contains(keyword) || user.Email.Contains(keyword));
+            }
+
+            var summaries = users
+                .OrderBy(user => user.DisplayName)
+                .ThenBy(user => user.Id)
+                .Select(user => new TodoUserSummaryDto
+                {
+                    UserId = user.Id,
+                    DisplayName = user.DisplayName,
+                    Email = user.Email,
+                    TodoCount = user.Todos.Count()
+                });
+
+            return await summaries.ToPagedResultAsync(page, pageSize);
+        }
+
+        private async Task<PagedResult<TodoDto>> GetTodosAsync(TodoQueryDto queryDto, int? userId)
+        {
+            var query = _todoRepo.All().AsNoTracking().Include(todo => todo.Category).AsQueryable();
+            if (userId.HasValue)
+                query = query.Where(todo => todo.UserId == userId.Value);
 
             if (!string.IsNullOrWhiteSpace(queryDto.Search))
             {
                 var search = queryDto.Search.Trim();
-                query = query.Where(t => t.Title.Contains(search) || (t.Description != null && t.Description.Contains(search)));
+                query = query.Where(todo => todo.Title.Contains(search) || (todo.Description != null && todo.Description.Contains(search)));
             }
 
-            if (queryDto.Status.HasValue) query = query.Where(t => t.Status == queryDto.Status.Value);
-            if (queryDto.Priority.HasValue) query = query.Where(t => t.Priority == queryDto.Priority.Value);
-            if (queryDto.CategoryId.HasValue) query = query.Where(t => t.CategoryId == queryDto.CategoryId);
+            if (queryDto.Status.HasValue) query = query.Where(todo => todo.Status == queryDto.Status.Value);
+            if (queryDto.Priority.HasValue) query = query.Where(todo => todo.Priority == queryDto.Priority.Value);
+            if (queryDto.CategoryId.HasValue) query = query.Where(todo => todo.CategoryId == queryDto.CategoryId);
 
             var now = DateTime.UtcNow;
 
             if (queryDto.IsOverdue.HasValue)
             {
                 query = queryDto.IsOverdue.Value
-                    ? query.Where(t => t.DueDate.HasValue && t.DueDate.Value < now && t.Status != TodoStatus.Done)
-                    : query.Where(t => !t.DueDate.HasValue || t.DueDate.Value >= now || t.Status == TodoStatus.Done);
+                    ? query.Where(todo => todo.DueDate.HasValue && todo.DueDate.Value < now && todo.Status != TodoStatus.Done)
+                    : query.Where(todo => !todo.DueDate.HasValue || todo.DueDate.Value >= now || todo.Status == TodoStatus.Done);
             }
-            query = queryDto.SortBy?.ToLower() switch
+            var orderedQuery = queryDto.SortBy?.ToLower() switch
             {
-                "title" => queryDto.IsDescending ? query.OrderByDescending(t => t.Title) : query.OrderBy(t => t.Title),
-                "priority" => queryDto.IsDescending ? query.OrderByDescending(t => t.Priority) : query.OrderBy(t => t.Priority),
-                "status" => queryDto.IsDescending ? query.OrderByDescending(t => t.Status) : query.OrderBy(t => t.Status),
-                "duedate" => queryDto.IsDescending ? query.OrderByDescending(t => t.DueDate) : query.OrderBy(t => t.DueDate),
-                "createdat" => queryDto.IsDescending ? query.OrderByDescending(t => t.CreatedAt) : query.OrderBy(t => t.CreatedAt),
-                _ => query.OrderByDescending(t => t.CreatedAt)
+                "title" => queryDto.IsDescending ? query.OrderByDescending(todo => todo.Title) : query.OrderBy(todo => todo.Title),
+                "priority" => queryDto.IsDescending ? query.OrderByDescending(todo => todo.Priority) : query.OrderBy(todo => todo.Priority),
+                "status" => queryDto.IsDescending ? query.OrderByDescending(todo => todo.Status) : query.OrderBy(todo => todo.Status),
+                "duedate" => queryDto.IsDescending ? query.OrderByDescending(todo => todo.DueDate) : query.OrderBy(todo => todo.DueDate),
+                "createdat" => queryDto.IsDescending ? query.OrderByDescending(todo => todo.CreatedAt) : query.OrderBy(todo => todo.CreatedAt),
+                _ => query.OrderByDescending(todo => todo.CreatedAt)
             };
-
-            return await query.ToPagedResultAsync<Todo, TodoDto>(queryDto.Page, queryDto.PageSize, _mapper);
+            return await orderedQuery.ThenBy(todo => todo.Id)
+                .ToPagedResultAsync<Todo, TodoDto>(queryDto.Page, queryDto.PageSize, _mapper);
         }
 
         // SAVE BATCH OF TODOS (CREATE, UPDATE, DELETE)

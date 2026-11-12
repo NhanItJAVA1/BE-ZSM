@@ -17,6 +17,7 @@ namespace BE_ZSM.Contexts
         public DbSet<TodoCategory> TodoCategories { get; set; }
         public DbSet<TodoActivity> TodoActivities { get; set; }
         public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
+        public DbSet<AdminRecoveryAudit> AdminRecoveryAudits => Set<AdminRecoveryAudit>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder){
             base.OnModelCreating(modelBuilder);
@@ -97,6 +98,17 @@ namespace BE_ZSM.Contexts
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(rolePermission => rolePermission.PermissionId);
+            });
+
+            modelBuilder.Entity<AdminRecoveryAudit>(entity =>
+            {
+                entity.HasKey(audit => audit.Id);
+                entity.Property(audit => audit.Action).IsRequired().HasMaxLength(100);
+                entity.Property(audit => audit.Reason).IsRequired().HasMaxLength(1000);
+                entity.Property(audit => audit.Outcome).IsRequired().HasMaxLength(50);
+                entity.Property(audit => audit.CreatedAtUtc).IsRequired();
+                entity.HasIndex(audit => audit.ActorUserId);
+                entity.HasIndex(audit => audit.TargetUserId);
             });
 
             modelBuilder.Entity<Todo>(entity =>
