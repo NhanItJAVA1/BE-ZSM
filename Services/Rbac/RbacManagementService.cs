@@ -14,7 +14,6 @@ namespace BE_ZSM.Services.Rbac;
 
 public sealed class RbacManagementService : IRbacManagementService
 {
-    private const string LegacyRecoveryRoleName = "RBAC_RECOVERY_ADMIN";
     private readonly AppDbContext _dbContext;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IGenericRepository<Role> _roleRepository;
@@ -36,48 +35,43 @@ public sealed class RbacManagementService : IRbacManagementService
         _userRoleRepository = unitOfWork.GetRepository<UserRole>();
     }
 
-    // Role management
+    // GET
     public async Task<IReadOnlyList<RoleResponseDto>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         return await _roleRepository.All().AsNoTracking()
             .OrderBy(role => role.Name)
-            .Select(role => new RoleResponseDto { Id = role.Id, Name = role.Name, Description = role.Description })
+            .ProjectTo<RoleResponseDto>(_mapper.ConfigurationProvider)
             .ToListAsync(cancellationToken);
     }
 
+    // POST
     public async Task<RoleResponseDto> CreateRoleAsync(SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
         var name = dto.Name!.Trim();
         var description = dto.Description?.Trim() ?? string.Empty;
-        var normalizedName = NormalizeRoleName(name);
-
-        if (normalizedName == LegacyRecoveryRoleName)
-            throw new ConflictException("The recovery role is system-managed", "RECOVERY_ROLE_PROTECTED");
+        var normalizedName = name.Trim().ToUpperInvariant();
 
         await EnsureRoleNameAvailableAsync(normalizedName, null, cancellationToken);
 
-        var nextId = checked((await _roleRepository.All().MaxAsync(role => (int?)role.Id, cancellationToken) ?? 0) + 1);
-        var role = new Role { Id = nextId, Name = name, Description = description };
+        var role = new Role {Name = name, Description = description };
         await _roleRepository.CreateAsync(role);
         await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
 
         return _mapper.Map<RoleResponseDto>(role);
     }
 
+    // PUT
     public async Task<RoleResponseDto> UpdateRoleAsync(int id, SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
         var name = dto.Name!.Trim();
         var description = dto.Description?.Trim() ?? string.Empty;
-        var normalizedName = NormalizeRoleName(name);
+        var normalizedName = name.Trim().ToUpperInvariant();
 
         var role = await _roleRepository.FindAsync(item => item.Id == id) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
 
-        EnsureNotRecoveryRole(role);
-        if (normalizedName == LegacyRecoveryRoleName)
-            throw new ConflictException("The recovery role is system-managed", "RECOVERY_ROLE_PROTECTED");
         await EnsureRoleNameAvailableAsync(normalizedName, id, cancellationToken);
 
-        if (IsDefaultRole(role) && NormalizeRoleName(role.Name) != normalizedName)
+        if (IsDefaultRole(role) && role.Name.Trim().ToUpperInvariant() != normalizedName)
             throw new ConflictException("The default User and Admin role names cannot be changed", "DEFAULT_ROLE_NAME_IMMUTABLE");
 
         role.Name = name;
@@ -87,6 +81,7 @@ public sealed class RbacManagementService : IRbacManagementService
         return _mapper.Map<RoleResponseDto>(role);
     }
 
+    // DELETE
     public async Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
     {
         var role = await _roleRepository.FindAsync(item => item.Id == id) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
@@ -143,15 +138,10 @@ public sealed class RbacManagementService : IRbacManagementService
             throw new ConflictException("The default User role cannot receive RBAC management permissions", "USER_ROLE_RBAC_PERMISSION_FORBIDDEN");
 
         var currentAssignments = await _rolePermissionRepository.Where(item => item.RoleId == roleId)
-            .Include(item => item.Permission)
             .ToListAsync(cancellationToken);
         var currentPermissionIds = currentAssignments.Select(item => item.PermissionId).ToHashSet();
 
         var requestedPermissionIds = permissionIds.ToHashSet();
-        if (role.NameNormalized == LegacyRecoveryRoleName
-            && requestedPermissionIds.Any(permissionId => !currentPermissionIds.Contains(permissionId)))
-            throw new ConflictException("Permissions cannot be added to the legacy recovery role", "RECOVERY_ROLE_PROTECTED");
-
         _rolePermissionRepository.DeleteRangeAsync(currentAssignments
             .Where(item => !requestedPermissionIds.Contains(item.PermissionId)));
 
@@ -190,10 +180,8 @@ public sealed class RbacManagementService : IRbacManagementService
             .Include(u => u.UserRoles)
             .FirstOrDefaultAsync(cancellationToken) ?? throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
-        var recoveryRoleId = await _roleRepository.All().Where(role => role.NameNormalized == LegacyRecoveryRoleName)
-            .Select(role => (int?)role.Id).SingleOrDefaultAsync(cancellationToken);
-        if (recoveryRoleId.HasValue && roleIds.Contains(recoveryRoleId.Value) && user.UserRoles.All(item => item.RoleId != recoveryRoleId.Value))
-            throw new ConflictException("The recovery role can only be assigned by the recovery workflow", "RECOVERY_ROLE_PROTECTED");
+        if (user.IsSystemOwner)
+            throw new ConflictException("System Owner cannot have their roles modified.", "SYSTEM_OWNER_PROTECTED");
 
         var roles = await _roleRepository.Where(r => roleIds.Contains(r.Id))
             .AsNoTracking()
@@ -271,14 +259,6 @@ public sealed class RbacManagementService : IRbacManagementService
 
         if (await matchingRoles.AnyAsync(cancellationToken))
             throw new ConflictException("A role with this name already exists", "ROLE_NAME_ALREADY_EXISTS");
-    }
-
-    private static string NormalizeRoleName(string name) => name.Trim().ToUpperInvariant();
-
-    private static void EnsureNotRecoveryRole(Role role)
-    {
-        if (role.NameNormalized == LegacyRecoveryRoleName)
-            throw new ConflictException("The recovery role is system-managed", "RECOVERY_ROLE_PROTECTED");
     }
 
 }

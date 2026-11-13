@@ -43,7 +43,7 @@ namespace BE_ZSM.Contexts
                     .HasMaxLength(50)
                     .HasComputedColumnSql("UPPER([Name])", stored: true);
                 entity.HasIndex(r => r.NameNormalized).IsUnique();
-                entity.Property(r => r.Id).ValueGeneratedNever();
+                entity.Property(r => r.Id).ValueGeneratedOnAdd();
                 entity.HasData(
                     new Role { Id = 2, Name = "Admin", Description = "Administrator" },
                     new Role { Id = 1, Name = "User", Description = "Regular User" }

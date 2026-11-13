@@ -192,7 +192,7 @@ public sealed class AdminRecoveryTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task LegacyRecoveryRoleCanBeSafelyCleanedUpButCannotBeReassignedOrRepurposed()
+    public async Task LegacyRecoveryRoleNameIsNoLongerSpecialInRbacManagement()
     {
         using var owner = _factory.CreateAuthenticatedClient(OwnerId);
         Assert.Equal(HttpStatusCode.NoContent, (await owner.PostAsJsonAsync("/api/admin-recovery/restore", Request(TestUsers.UserAId))).StatusCode);
@@ -212,19 +212,8 @@ public sealed class AdminRecoveryTests : IAsyncLifetime, IDisposable
         await db.SaveChangesAsync();
         using var ordinaryAdmin = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
 
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.PutAsJsonAsync($"/api/roles/{role.Id}", new { name = "renamed", description = "" })).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.PostAsJsonAsync("/api/roles", new { name = legacyRoleName, description = "" })).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.DeleteAsync($"/api/roles/{role.Id}")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.PutAsJsonAsync($"/api/roles/{role.Id}/permissions", new { permissionIds = rolePermissions.Append(
-            await db.Permissions.Where(item => item.Code == PermissionCodes.TodoRead).Select(item => item.Id).SingleAsync()).ToArray() })).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.PutAsJsonAsync($"/api/users/{TestUsers.UserBId}/roles", new { roleIds = new[] { role.Id } })).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict, (await ordinaryAdmin.DeleteAsync($"/api/users/{OwnerId}")).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await ordinaryAdmin.PutAsJsonAsync($"/api/roles/{role.Id}/permissions", new { permissionIds = Array.Empty<int>() })).StatusCode);
-        Assert.Equal(HttpStatusCode.OK, (await ordinaryAdmin.PutAsJsonAsync($"/api/users/{TestUsers.UserAId}/roles", new { roleIds = new[] { 1, 2 } })).StatusCode);
-        Assert.False(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
-        Assert.False(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserAId && item.RoleId == role.Id));
-        Assert.Equal(HttpStatusCode.NoContent, (await ordinaryAdmin.DeleteAsync($"/api/roles/{role.Id}")).StatusCode);
-        Assert.False(await db.Roles.AnyAsync(item => item.Id == role.Id));
+        Assert.Equal(HttpStatusCode.OK, (await ordinaryAdmin.PutAsJsonAsync($"/api/roles/{role.Id}", new { name = "renamed", description = "" })).StatusCode);
+        Assert.Equal("renamed", await db.Roles.Where(item => item.Id == role.Id).Select(item => item.Name).SingleAsync());
     }
 
     [Fact]

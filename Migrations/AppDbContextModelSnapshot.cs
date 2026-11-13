@@ -174,7 +174,10 @@ namespace BE_ZSM.Migrations
             modelBuilder.Entity("BE_ZSM.Entities.Role", b =>
                 {
                     b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .IsRequired()
