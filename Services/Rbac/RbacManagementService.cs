@@ -51,8 +51,6 @@ public sealed class RbacManagementService : IRbacManagementService
         var description = dto.Description?.Trim() ?? string.Empty;
         var normalizedName = name.Trim().ToUpperInvariant();
 
-        await EnsureRoleNameAvailableAsync(normalizedName, null, cancellationToken);
-
         var role = new Role {Name = name, Description = description };
         await _roleRepository.CreateAsync(role);
         await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
@@ -68,8 +66,6 @@ public sealed class RbacManagementService : IRbacManagementService
         var normalizedName = name.Trim().ToUpperInvariant();
 
         var role = await _roleRepository.FindAsync(item => item.Id == id) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
-
-        await EnsureRoleNameAvailableAsync(normalizedName, id, cancellationToken);
 
         if (IsDefaultRole(role) && role.Name.Trim().ToUpperInvariant() != normalizedName)
             throw new ConflictException("The default User and Admin role names cannot be changed", "DEFAULT_ROLE_NAME_IMMUTABLE");
@@ -155,7 +151,9 @@ public sealed class RbacManagementService : IRbacManagementService
 
         await SaveChangesWithConflictHandlingAsync("ROLE_PERMISSION_CONCURRENCY_CONFLICT", "Role permissions changed concurrently");
 
-        return permissions.OrderBy(permission => permission.Code).Select(_mapper.Map<PermissionResponseDto>).ToList();
+        return permissions.OrderBy(permission => permission.Code)
+            .Select(_mapper.Map<PermissionResponseDto>)
+            .ToList();
     }
 
     // User role management
@@ -168,7 +166,7 @@ public sealed class RbacManagementService : IRbacManagementService
             .Where(item => item.UserId == userId)
             .Select(item => item.Role)
             .OrderBy(role => role.Name)
-            .Select(role => new RoleResponseDto { Id = role.Id, Name = role.Name, Description = role.Description })
+            .ProjectTo<RoleResponseDto>(_mapper.ConfigurationProvider)
             .ToListAsync(cancellationToken);
     }
 
@@ -210,8 +208,8 @@ public sealed class RbacManagementService : IRbacManagementService
 
         return _mapper.Map<List<RoleResponseDto>>(roles.OrderBy(r => r.Name).ToList());
     }
-    
-   
+
+
     // SaveChanges runs in EF Core's implicit transaction; translate expected constraint and concurrency failures.
     private async Task SaveChangesWithConflictHandlingAsync(string conflictCode, string conflictMessage)
     {
@@ -219,46 +217,28 @@ public sealed class RbacManagementService : IRbacManagementService
         {
             await _unitOfWork.SaveChangesAsync();
         }
-        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
-        {
-            throw new ConflictException("A unique role or relationship constraint was violated", conflictCode);
-        }
-        catch (Exception exception) when (IsConcurrencyConflict(exception))
+        catch (DbUpdateConcurrencyException)
         {
             throw new ConflictException(conflictMessage, conflictCode);
         }
-    }
+        catch (DbUpdateException ex) when (GetSqlException(ex)?.Number is 2601 or 2627)
+        {
+            throw new ConflictException(conflictMessage, conflictCode);
+        }
+        catch (Exception ex) when (GetSqlException(ex)?.Number is 1205 or 3960 or 1222)
+        {
+            throw new ConflictException("Database transaction conflict", "DATABASE_TRANSACTION_CONFLICT");
+        }
 
-    private static bool IsUniqueConstraintViolation(DbUpdateException exception)
-    {
-        for (Exception? current = exception; current != null; current = current.InnerException)
-            if (current is SqlException sqlException && sqlException.Number is 2601 or 2627)
-                return true;
-        return false;
-    }
-
-    private static bool IsConcurrencyConflict(Exception exception)
-    {
-        if (exception is DbUpdateConcurrencyException)
-            return true;
-        for (Exception? current = exception; current != null; current = current.InnerException)
-            if (current is SqlException sqlException && sqlException.Number is 1205 or 3960 or 1222)
-                return true;
-        return false;
+        static SqlException? GetSqlException(Exception ex) =>
+            ex switch
+            {
+                SqlException sqlEx => sqlEx, DbUpdateException { InnerException: SqlException sqlEx } => sqlEx,
+                _ => null
+            };
     }
 
     private static bool IsDefaultRole(Role role) => role.Id is 1 or 2
         || role.NameNormalized is "USER" or "ADMIN";
-
-    private async Task EnsureRoleNameAvailableAsync(string normalizedName, int? exceptRoleId, CancellationToken cancellationToken)
-    {
-        var matchingRoles = _roleRepository.All().AsNoTracking()
-            .Where(role => role.Name.ToUpper() == normalizedName);
-        if (exceptRoleId.HasValue)
-            matchingRoles = matchingRoles.Where(role => role.Id != exceptRoleId.Value);
-
-        if (await matchingRoles.AnyAsync(cancellationToken))
-            throw new ConflictException("A role with this name already exists", "ROLE_NAME_ALREADY_EXISTS");
-    }
 
 }

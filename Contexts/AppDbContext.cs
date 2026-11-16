@@ -29,7 +29,7 @@ namespace BE_ZSM.Contexts
                 entity.HasOne(u => u.Role)
                     .WithMany(r => r.Users)
                     .HasForeignKey(u => u.RoleId)
-                    .OnDelete(DeleteBehavior.Cascade);
+                    .OnDelete(DeleteBehavior.NoAction);
                 entity.HasIndex(user => user.IsSystemOwner)
                     .IsUnique()
                     .HasFilter("[IsSystemOwner] = 1");
