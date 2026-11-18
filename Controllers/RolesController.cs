@@ -54,4 +54,10 @@ public sealed class RolesController : ControllerBase
     {
         return Ok(await _rbacService.ReplaceRolePermissionsAsync(id, dto, cancellationToken));
     }
+
+    [HttpGet("{id:int}/users")]
+    [HasPermission(PermissionCodes.RolesRead)]
+    public async Task<IActionResult> GetRoleUsers(int id, [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default) =>
+        Ok(await _rbacService.GetRoleUsersAsync(id, page, pageSize, cancellationToken));
 }

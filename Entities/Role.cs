@@ -13,8 +13,6 @@ namespace BE_ZSM.Entities
         public string Description { get; set; } = string.Empty;
         public ICollection<User> Users { get; set; } = new List<User>();
         public ICollection<Rbac.UserRole> UserRoles { get; set; } = new List<Rbac.UserRole>();
-        public ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
-
+        public ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();        
     }
 }
-

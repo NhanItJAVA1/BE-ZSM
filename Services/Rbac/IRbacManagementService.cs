@@ -1,4 +1,5 @@
 using BE_ZSM.DTOs.Rbac;
+using BE_ZSM.Responses;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -16,4 +17,6 @@ public interface IRbacManagementService
     Task<IReadOnlyList<PermissionResponseDto>> ReplaceRolePermissionsAsync(int roleId, ReplaceRolePermissionsDto dto, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RoleResponseDto>> GetUserRolesAsync(int userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RoleResponseDto>> ReplaceUserRolesAsync(int userId, ReplaceUserRolesDto dto, CancellationToken cancellationToken = default);
+    Task<PagedResult<RoleUserDto>> GetRoleUsersAsync(int roleId, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default);
+    Task RemoveUserRoleAsync(int userId, int roleId, CancellationToken cancellationToken = default);
 }

@@ -70,5 +70,13 @@ public class UsersController : ControllerBase
         return Ok(await _rbacService.ReplaceUserRolesAsync(id, dto, cancellationToken));
     }
 
+    [HttpDelete("{id:int}/roles/{roleId:int}")]
+    [HasPermission(PermissionCodes.UsersManageRoles)]
+    public async Task<IActionResult> RemoveUserRole(int id, int roleId, CancellationToken cancellationToken)
+    {
+        await _rbacService.RemoveUserRoleAsync(id, roleId, cancellationToken);
+        return NoContent();
+    }
+
 }
 

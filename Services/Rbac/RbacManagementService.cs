@@ -3,6 +3,8 @@ using AutoMapper.QueryableExtensions;
 using BE_ZSM.Authorization;
 using BE_ZSM.Contexts;
 using BE_ZSM.DTOs.Rbac;
+using BE_ZSM.Extensions;
+using BE_ZSM.Responses;
 using BE_ZSM.Entities;
 using BE_ZSM.Entities.Rbac;
 using BE_ZSM.Exceptions;
@@ -53,7 +55,7 @@ public sealed class RbacManagementService : IRbacManagementService
 
         var role = new Role {Name = name, Description = description };
         await _roleRepository.CreateAsync(role);
-        await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
+        await _unitOfWork.SaveChangesAsync();
 
         return _mapper.Map<RoleResponseDto>(role);
     }
@@ -72,7 +74,7 @@ public sealed class RbacManagementService : IRbacManagementService
 
         role.Name = name;
         role.Description = description;
-        await SaveChangesWithConflictHandlingAsync("ROLE_NAME_ALREADY_EXISTS", "A role with this name already exists");
+        await _unitOfWork.SaveChangesAsync();
 
         return _mapper.Map<RoleResponseDto>(role);
     }
@@ -92,7 +94,7 @@ public sealed class RbacManagementService : IRbacManagementService
             throw new ConflictException("Role is still assigned or has permissions", "ROLE_IN_USE");
 
         _dbContext.Roles.Remove(role);
-        await SaveChangesWithConflictHandlingAsync("ROLE_DELETE_CONFLICT", "Role could not be deleted because it is still in use");
+        await _unitOfWork.SaveChangesAsync();
     }
 
     // Permission management
@@ -149,8 +151,7 @@ public sealed class RbacManagementService : IRbacManagementService
                 PermissionId = permission.Id
             }));
 
-        await SaveChangesWithConflictHandlingAsync("ROLE_PERMISSION_CONCURRENCY_CONFLICT", "Role permissions changed concurrently");
-
+        await _unitOfWork.SaveChangesAsync();
         return permissions.OrderBy(permission => permission.Code)
             .Select(_mapper.Map<PermissionResponseDto>)
             .ToList();
@@ -204,38 +205,61 @@ public sealed class RbacManagementService : IRbacManagementService
             ?? roles.FirstOrDefault(r => r.Name == "User")?.Id 
             ?? roles.Min(r => r.Id);
 
-        await SaveChangesWithConflictHandlingAsync("USER_ROLE_CONCURRENCY_CONFLICT", "User roles changed concurrently");
-
+        await _unitOfWork.SaveChangesAsync();
         return _mapper.Map<List<RoleResponseDto>>(roles.OrderBy(r => r.Name).ToList());
     }
 
-
-    // SaveChanges runs in EF Core's implicit transaction; translate expected constraint and concurrency failures.
-    private async Task SaveChangesWithConflictHandlingAsync(string conflictCode, string conflictMessage)
+    public async Task<PagedResult<RoleUserDto>> GetRoleUsersAsync(int roleId, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        try
+        if (!await _roleRepository.All().AsNoTracking().AnyAsync(role => role.Id == roleId, cancellationToken))
+            throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
+
+        var users = _userRoleRepository.All().AsNoTracking()
+            .Where(assignment => assignment.RoleId == roleId)
+            .OrderBy(assignment => assignment.UserId)
+            .Select(assignment => new RoleUserDto
+            {
+                UserId = assignment.UserId,
+                DisplayName = assignment.User.DisplayName
+            });
+
+        return await users.ToPagedResultAsync(page, pageSize);
+    }
+
+    public async Task RemoveUserRoleAsync(int userId, int roleId, CancellationToken cancellationToken = default)
+    {
+        var user = await _userRepository.Where(item => item.Id == userId)
+            .Include(item => item.UserRoles)
+            .FirstOrDefaultAsync(cancellationToken) ?? throw new NotFoundException("User not found", "USER_NOT_FOUND");
+        var role = await _roleRepository.FindAsync(item => item.Id == roleId) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
+
+        if (user.IsSystemOwner)
+            throw new ConflictException("System Owner cannot have their roles modified.", "SYSTEM_OWNER_PROTECTED");
+
+        var assignment = user.UserRoles.SingleOrDefault(item => item.RoleId == roleId)
+            ?? throw new NotFoundException("User role assignment not found", "USER_ROLE_NOT_FOUND");
+
+        if (user.UserRoles.Count <= 1)
+            throw new ConflictException("A user must retain at least one role.", "USER_LAST_ROLE_PROTECTED");
+
+        if (role.Id == 2 && role.NameNormalized == "ADMIN")
         {
-            await _unitOfWork.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new ConflictException(conflictMessage, conflictCode);
-        }
-        catch (DbUpdateException ex) when (GetSqlException(ex)?.Number is 2601 or 2627)
-        {
-            throw new ConflictException(conflictMessage, conflictCode);
-        }
-        catch (Exception ex) when (GetSqlException(ex)?.Number is 1205 or 3960 or 1222)
-        {
-            throw new ConflictException("Database transaction conflict", "DATABASE_TRANSACTION_CONFLICT");
+            var otherAdmins = await _userRoleRepository.All().AsNoTracking()
+                .CountAsync(item => item.RoleId == roleId && item.UserId != userId, cancellationToken);
+            if (otherAdmins == 0)
+                throw new ConflictException("The last Admin role assignment cannot be removed.", "LAST_ADMIN_PROTECTED");
         }
 
-        static SqlException? GetSqlException(Exception ex) =>
-            ex switch
-            {
-                SqlException sqlEx => sqlEx, DbUpdateException { InnerException: SqlException sqlEx } => sqlEx,
-                _ => null
-            };
+        _userRoleRepository.DeleteRangeAsync(new[] { assignment });
+        if (user.RoleId == roleId)
+        {
+            user.RoleId = user.UserRoles.Where(item => item.RoleId != roleId)
+                .Select(item => item.RoleId)
+                .OrderBy(id => id)
+                .First();
+        }
+
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private static bool IsDefaultRole(Role role) => role.Id is 1 or 2

@@ -28,8 +28,10 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/roles")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/permissions")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/roles/1/permissions")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/roles/1/users")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PutAsJsonAsync(
             $"/api/users/{TestUsers.UserAId}/roles", new { roleIds = new[] { 2 } })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/1")).StatusCode);
     }
 
     [Fact]
@@ -73,6 +75,83 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
         Assert.Contains(list!, role => role.Name == "Auditor");
         var permissions = await client.GetFromJsonAsync<List<PermissionDto>>("/api/permissions");
         Assert.Contains(permissions!, permission => permission.Code == PermissionCodes.UsersManageRoles);
+    }
+
+    [Fact]
+    public async Task RoleUsers_ArePagedAndExposeOnlyUserIdAndDisplayName()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+
+        var firstPageResponse = await client.GetAsync("/api/roles/1/users?page=1&pageSize=1");
+        var emptyResponse = await client.GetAsync("/api/roles/999/users");
+
+        Assert.Equal(HttpStatusCode.OK, firstPageResponse.StatusCode);
+        using var firstPage = System.Text.Json.JsonDocument.Parse(await firstPageResponse.Content.ReadAsStringAsync());
+        Assert.Equal(2, firstPage.RootElement.GetProperty("totalItems").GetInt32());
+        Assert.Equal(1, firstPage.RootElement.GetProperty("pageSize").GetInt32());
+        var item = Assert.Single(firstPage.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal(new[] { "userId", "displayName" }, item.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(HttpStatusCode.NotFound, emptyResponse.StatusCode);
+
+        var emptyRole = await client.PostAsJsonAsync("/api/roles", new { name = "Empty", description = "" });
+        var role = await emptyRole.Content.ReadFromJsonAsync<RoleDto>();
+        var emptyUsers = await client.GetFromJsonAsync<PagedUsers>($"/api/roles/{role!.Id}/users");
+        Assert.Empty(emptyUsers!.Items);
+        Assert.Equal(0, emptyUsers.TotalItems);
+    }
+
+    [Fact]
+    public async Task QuickRoleRemoval_PreservesOtherRolesAndPrimaryConsistency()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var create = await client.PostAsJsonAsync("/api/roles", new { name = "Auditor", description = "" });
+        var role = await create.Content.ReadFromJsonAsync<RoleDto>();
+        Assert.NotNull(role);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.UserRoles.Add(new UserRole { UserId = TestUsers.UserBId, RoleId = role.Id });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/{role.Id}")).StatusCode);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 1));
+        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
+        Assert.Equal(1, await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId).Select(user => user.RoleId).SingleAsync());
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/{role.Id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task QuickRoleRemoval_ReplacesRemovedPrimaryAndRejectsLastRole()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var create = await client.PostAsJsonAsync("/api/roles", new { name = "Auditor", description = "" });
+        var role = await create.Content.ReadFromJsonAsync<RoleDto>();
+        Assert.NotNull(role);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.UserRoles.Add(new UserRole { UserId = TestUsers.UserBId, RoleId = role.Id });
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/1")).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict,
+            (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/{role.Id}")).StatusCode);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(role.Id, await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId)
+            .Select(user => user.RoleId).SingleAsync());
+        Assert.True(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
+        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 1));
     }
 
     [Fact]
@@ -392,6 +471,18 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
     {
         public int Id { get; set; }
         public string Name { get; set; } = string.Empty;
+    }
+
+    private sealed class PagedUsers
+    {
+        public List<RoleUserDto> Items { get; set; } = [];
+        public int TotalItems { get; set; }
+    }
+
+    private sealed class RoleUserDto
+    {
+        public int UserId { get; set; }
+        public string DisplayName { get; set; } = string.Empty;
     }
 
     private sealed class PermissionDto
