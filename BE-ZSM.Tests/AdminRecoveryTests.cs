@@ -118,6 +118,28 @@ public sealed class AdminRecoveryTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task OwnerRestorationSetsAdminAsPrimaryForZeroRoleUser()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.UserRoles.RemoveRange(await db.UserRoles.Where(item => item.UserId == TestUsers.UserAId).ToListAsync());
+            var target = await db.Users.SingleAsync(user => user.Id == TestUsers.UserAId);
+            target.RoleId = null;
+            await db.SaveChangesAsync();
+        }
+
+        using var owner = _factory.CreateAuthenticatedClient(OwnerId);
+        var response = await owner.PostAsJsonAsync("/api/admin-recovery/restore", Request(TestUsers.UserAId));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(2, await verifyDb.Users.Where(user => user.Id == TestUsers.UserAId).Select(user => user.RoleId).SingleAsync());
+        Assert.True(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserAId && item.RoleId == 2));
+    }
+
+    [Fact]
     public async Task RecoveryRestoresFourAdminPermissionsAndPreservesExistingAdminPermissions()
     {
         using (var setupScope = _factory.Services.CreateScope())

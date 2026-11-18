@@ -32,6 +32,40 @@ public sealed class TodoAuthorizationBoundaryTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task MyTodosCache_IsUserScopedAndInvalidatedAfterBatchSave()
+    {
+        await SeedTodosAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+
+        var initial = await client.GetFromJsonAsync<PagedTodos>("/api/todos/me");
+        Assert.Equal("A todo", initial!.Items.Single(todo => todo.Id == 101).Title);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var todo = await db.Todos.SingleAsync(item => item.Id == 101);
+            todo.Title = "Changed directly";
+            await db.SaveChangesAsync();
+        }
+
+        var cached = await client.GetFromJsonAsync<PagedTodos>("/api/todos/me");
+        Assert.Equal("A todo", cached!.Items.Single(todo => todo.Id == 101).Title);
+
+        var save = await client.PutAsJsonAsync("/api/todos/batch", new[]
+        {
+            new { id = 101, title = "Changed by batch", priority = TodoPriority.High.ToString() }
+        });
+        Assert.True(save.StatusCode == HttpStatusCode.OK, await save.Content.ReadAsStringAsync());
+
+        var refreshed = await client.GetFromJsonAsync<PagedTodos>("/api/todos/me");
+        Assert.Equal("Changed by batch", refreshed!.Items.Single(todo => todo.Id == 101).Title);
+
+        using var otherUserClient = _factory.CreateAuthenticatedClient(TestUsers.UserBId);
+        var otherUserTodos = await otherUserClient.GetFromJsonAsync<PagedTodos>("/api/todos/me");
+        Assert.Equal(new[] { 201 }, otherUserTodos!.Items.Select(todo => todo.Id));
+    }
+
+    [Fact]
     public async Task TodosReadAll_CanReadOtherUsersAndAllTodos()
     {
         await SeedTodosAsync();
@@ -172,6 +206,7 @@ public sealed class TodoAuthorizationBoundaryTests : IAsyncLifetime, IDisposable
     private sealed class TodoItem
     {
         public int Id { get; set; }
+        public string Title { get; set; } = string.Empty;
     }
 
     private sealed class PagedUsers

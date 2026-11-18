@@ -56,7 +56,7 @@ public sealed class AuthServiceTests : IDisposable
                 Email = user.Email,
                 DisplayName = user.DisplayName,
                 AvatarUrl = user.AvatarUrl,
-                Role = user.Role.Name.ToString(),
+                Role = user.Role?.Name,
                 CreatedAt = user.CreatedAt,
                 UpdatedAt = user.UpdatedAt
             });
@@ -113,6 +113,34 @@ public sealed class AuthServiceTests : IDisposable
         Assert.Contains("roles.manage-permissions", login.User.Permissions);
         Assert.Contains("users.manage-roles", login.User.Permissions);
         Assert.Equal(login.User.Permissions, refresh.User.Permissions);
+    }
+
+    [Fact]
+    public async Task ZeroRoleUser_CanLoginAndRefreshWithoutRoleClaimsOrPermissions()
+    {
+        _db.Users.Add(new User
+        {
+            Username = "zero-role-user",
+            Email = "zero-role-user@example.test",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret"),
+            DisplayName = "Zero Role User",
+            RoleId = null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+
+        var login = await _service.LoginAsync(new LoginUserDto { Username = "zero-role-user", Password = "secret" });
+        var refreshed = await _service.RefreshTokenAsync(login.RefreshToken);
+        var loginClaims = new JwtSecurityTokenHandler().ReadJwtToken(login.AccessToken).Claims;
+        var refreshClaims = new JwtSecurityTokenHandler().ReadJwtToken(refreshed.AccessToken).Claims;
+
+        Assert.DoesNotContain(loginClaims, claim => claim.Type == ClaimTypes.Role);
+        Assert.DoesNotContain(refreshClaims, claim => claim.Type == ClaimTypes.Role);
+        Assert.Empty(login.User.Permissions);
+        Assert.Empty(refreshed.User.Permissions);
+        Assert.Null(login.User.Role);
+        Assert.Null(refreshed.User.Role);
     }
 
     [Fact]
@@ -195,6 +223,19 @@ public sealed class AuthServiceTests : IDisposable
         Assert.Equal("User", response.Role);
         Assert.Equal(new[] { "Admin", "User" }, response.Roles);
         Assert.Equal(new[] { "roles.create", "todo.read" }, response.Permissions);
+    }
+
+    [Fact]
+    public void UserResponseMapping_AllowsMissingPrimaryRole()
+    {
+        var mapper = new MapperConfiguration(
+            config => config.AddProfile<MappingProfile>(),
+            NullLoggerFactory.Instance).CreateMapper();
+        var response = mapper.Map<UserResponseDto>(new User { RoleId = null, Role = null });
+
+        Assert.Null(response.Role);
+        Assert.Empty(response.Roles);
+        Assert.Empty(response.Permissions);
     }
 
     [Fact]

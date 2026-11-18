@@ -52,10 +52,6 @@ namespace BE_ZSM.Validators.Rbac
                 .NotNull()
                 .WithErrorCode("RBAC_IDS_INVALID")
 
-                .NotEmpty()
-                .WithMessage("User must have at least one role")
-                .WithErrorCode("USER_ROLE_REQUIRED")
-
                 .Must(ids => ids!.All(id => id > 0))
                 .WithMessage("RoleIds must contain positive IDs")
                 .WithErrorCode("RBAC_IDS_INVALID")

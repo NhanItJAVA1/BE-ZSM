@@ -37,9 +37,7 @@ public class UsersController : ControllerBase
 
     [HttpPut("{id}")]
     [HasPermission(PermissionCodes.UsersUpdate)]
-    public async Task<IActionResult> UpdateUser(
-        int id,
-        UpdateUserDto dto)
+    public async Task<IActionResult> UpdateUser(int id, UpdateUserDto dto)
     {
         await _userService.UpdateAsync(id, dto);
         return Ok();

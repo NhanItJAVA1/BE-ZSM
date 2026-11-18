@@ -14,7 +14,7 @@ public class MappingProfile : Profile
         CreateMap<User, UserResponseDto>()
             .ForMember(
                 dest => dest.Role,
-                opt => opt.MapFrom(src => src.Role.Name))
+                opt => opt.MapFrom(src => src.Role == null ? null : src.Role.Name))
             .ForMember(dest => dest.Roles, opt => opt.MapFrom(src => src.UserRoles
                 .Select(ur => ur.Role.Name)
                 .Distinct()

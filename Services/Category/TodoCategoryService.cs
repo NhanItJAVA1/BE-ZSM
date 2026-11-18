@@ -3,6 +3,7 @@ using BE_ZSM.DTOs.Todos.Categories;
 using BE_ZSM.Entities;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Generic;
+using BE_ZSM.Services.Cache;
 using Microsoft.EntityFrameworkCore;
 namespace BE_ZSM.Services.Category
 {
@@ -12,15 +13,18 @@ namespace BE_ZSM.Services.Category
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGenericRepository<TodoCategory> _categoryRepo;
         private readonly IGenericRepository<Todo> _todoRepo;
+        private readonly ICacheService _cacheService;
 
         public TodoCategoryService(
             IMapper mapper,
-            IUnitOfWork unitOfWork)
+            IUnitOfWork unitOfWork,
+            ICacheService cacheService)
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
             _todoRepo = _unitOfWork.GetRepository<Todo>();
+            _cacheService = cacheService;
         }
 
         public async Task<List<TodoCategoryDto>> GetCategoriesAsync(int userId)
@@ -66,6 +70,7 @@ namespace BE_ZSM.Services.Category
 
             _mapper.Map(dto, category);
             await _unitOfWork.SaveChangesAsync();
+            await _cacheService.RemoveAsync($"todos:me:{userId}");
         }
 
         public async Task DeleteCategoryAsync(int id, int userId, bool deleteTodos)
@@ -89,6 +94,7 @@ namespace BE_ZSM.Services.Category
 
             await _categoryRepo.DeleteAsync(category);
             await _unitOfWork.SaveChangesAsync();
+            await _cacheService.RemoveAsync($"todos:me:{userId}");
         }
     }
 }

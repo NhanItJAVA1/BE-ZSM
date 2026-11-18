@@ -182,6 +182,15 @@ public sealed class RbacManagementService : IRbacManagementService
         if (user.IsSystemOwner)
             throw new ConflictException("System Owner cannot have their roles modified.", "SYSTEM_OWNER_PROTECTED");
 
+        var currentAdminRole = user.UserRoles.FirstOrDefault(assignment => assignment.RoleId == 2);
+        if (currentAdminRole is not null && !roleIds.Contains(2))
+        {
+            var otherAdmins = await _userRoleRepository.All().AsNoTracking()
+                .CountAsync(assignment => assignment.RoleId == 2 && assignment.UserId != userId, cancellationToken);
+            if (otherAdmins == 0)
+                throw new ConflictException("The last Admin role assignment cannot be removed.", "LAST_ADMIN_PROTECTED");
+        }
+
         var roles = await _roleRepository.Where(r => roleIds.Contains(r.Id))
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -201,9 +210,9 @@ public sealed class RbacManagementService : IRbacManagementService
                     RoleId = r.Id
                 }));
 
-        user.RoleId = roles.FirstOrDefault(r => r.Id == user.RoleId)?.Id 
-            ?? roles.FirstOrDefault(r => r.Name == "User")?.Id 
-            ?? roles.Min(r => r.Id);
+        user.RoleId = roles.FirstOrDefault(r => r.Id == user.RoleId)?.Id
+            ?? roles.FirstOrDefault(r => r.Name == "User")?.Id
+            ?? (roles.Count == 0 ? null : roles.Min(r => r.Id));
 
         await _unitOfWork.SaveChangesAsync();
         return _mapper.Map<List<RoleResponseDto>>(roles.OrderBy(r => r.Name).ToList());
@@ -239,9 +248,6 @@ public sealed class RbacManagementService : IRbacManagementService
         var assignment = user.UserRoles.SingleOrDefault(item => item.RoleId == roleId)
             ?? throw new NotFoundException("User role assignment not found", "USER_ROLE_NOT_FOUND");
 
-        if (user.UserRoles.Count <= 1)
-            throw new ConflictException("A user must retain at least one role.", "USER_LAST_ROLE_PROTECTED");
-
         if (role.Id == 2 && role.NameNormalized == "ADMIN")
         {
             var otherAdmins = await _userRoleRepository.All().AsNoTracking()
@@ -256,10 +262,85 @@ public sealed class RbacManagementService : IRbacManagementService
             user.RoleId = user.UserRoles.Where(item => item.RoleId != roleId)
                 .Select(item => item.RoleId)
                 .OrderBy(id => id)
-                .First();
+                .Select(role => (int?)role)
+                .FirstOrDefault();
         }
 
         await _unitOfWork.SaveChangesAsync();
+    }
+
+    public async Task BulkRemoveRoleFromUsersAsync(int roleId, BulkRemoveRoleUsersDto dto, CancellationToken cancellationToken = default)
+    {
+        var userIds = dto.UserIds;
+        if (userIds is null || userIds.Count == 0)
+            throw new BadRequestException("At least one user ID is required.", "USER_IDS_REQUIRED");
+        if (userIds.Distinct().Count() != userIds.Count)
+            throw new BadRequestException("User IDs must not contain duplicates.", "USER_IDS_DUPLICATE");
+        if (userIds.Any(userId => userId <= 0))
+            throw new BadRequestException("User IDs must be positive.", "USER_IDS_INVALID");
+
+        await using var transaction = _dbContext.Database.IsRelational()
+            ? await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
+            : null;
+
+        try
+        {
+            var role = await _roleRepository.All().AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Id == roleId, cancellationToken)
+                ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
+
+            var users = await _userRepository.Where(user => userIds.Contains(user.Id))
+                .Include(user => user.UserRoles)
+                .ToListAsync(cancellationToken);
+            if (users.Count != userIds.Count)
+                throw new NotFoundException("One or more users were not found", "USER_NOT_FOUND");
+            if (users.Any(user => user.IsSystemOwner))
+                throw new ConflictException("System Owner cannot have their roles modified.", "SYSTEM_OWNER_PROTECTED");
+            if (users.Any(user => user.UserRoles.All(assignment => assignment.RoleId != roleId)))
+                throw new NotFoundException("One or more users do not have this role assignment", "USER_ROLE_NOT_FOUND");
+            if (role.Id == 2 && role.NameNormalized == "ADMIN")
+            {
+                var selectedUserIds = userIds.ToHashSet();
+                var remainingAdmins = await _userRoleRepository.All().AsNoTracking()
+                    .CountAsync(assignment => assignment.RoleId == roleId && !selectedUserIds.Contains(assignment.UserId), cancellationToken);
+                if (remainingAdmins == 0)
+                    throw new ConflictException("The last Admin role assignment cannot be removed.", "LAST_ADMIN_PROTECTED");
+            }
+
+            var defaultUserRoleId = users.Any(user => user.RoleId == roleId)
+                ? await _roleRepository.All().AsNoTracking()
+                    .Where(item => item.NameNormalized == "USER")
+                    .Select(item => (int?)item.Id)
+                    .SingleOrDefaultAsync(cancellationToken)
+                : null;
+
+            foreach (var user in users)
+            {
+                var assignment = user.UserRoles.Single(item => item.RoleId == roleId);
+                _userRoleRepository.DeleteRangeAsync(new[] { assignment });
+                if (user.RoleId == roleId)
+                {
+                    var remainingRoleIds = user.UserRoles.Where(item => item.RoleId != roleId)
+                        .Select(item => item.RoleId)
+                        .ToList();
+                    user.RoleId = remainingRoleIds.Count == 0 ? null
+                        : defaultUserRoleId.HasValue && remainingRoleIds.Contains(defaultUserRoleId.Value)
+                        ? defaultUserRoleId.Value
+                        : remainingRoleIds.Min();
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken);
+        }
+        catch
+        {
+            if (transaction is not null)
+                await transaction.RollbackAsync(CancellationToken.None);
+            _dbContext.ChangeTracker.Clear();
+            throw;
+        }
     }
 
     private static bool IsDefaultRole(Role role) => role.Id is 1 or 2

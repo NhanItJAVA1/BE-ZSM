@@ -60,4 +60,13 @@ public sealed class RolesController : ControllerBase
     public async Task<IActionResult> GetRoleUsers(int id, [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default) =>
         Ok(await _rbacService.GetRoleUsersAsync(id, page, pageSize, cancellationToken));
+
+    [HttpPost("{id:int}/users/bulk-remove")]
+    [HasPermission(PermissionCodes.UsersManageRoles)]
+    public async Task<IActionResult> BulkRemoveRoleFromUsers(int id, [FromBody] BulkRemoveRoleUsersDto dto,
+        CancellationToken cancellationToken)
+    {
+        await _rbacService.BulkRemoveRoleFromUsersAsync(id, dto, cancellationToken);
+        return NoContent();
+    }
 }

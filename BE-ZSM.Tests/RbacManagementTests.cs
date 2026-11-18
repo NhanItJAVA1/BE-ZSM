@@ -144,14 +144,138 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
 
         Assert.Equal(HttpStatusCode.NoContent,
             (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/1")).StatusCode);
-        Assert.Equal(HttpStatusCode.Conflict,
+        Assert.Equal(HttpStatusCode.NoContent,
             (await client.DeleteAsync($"/api/users/{TestUsers.UserBId}/roles/{role.Id}")).StatusCode);
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        Assert.Equal(role.Id, await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId)
+        Assert.Null(await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId)
             .Select(user => user.RoleId).SingleAsync());
-        Assert.True(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
-        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 1));
+        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId));
+    }
+
+    [Fact]
+    public async Task BulkRoleRemoval_RemovesSelectedAssignmentsAndPreservesOthers()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var role = await CreateRoleAndAssignToBothAsync(client, "BulkAudit");
+
+        var response = await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove",
+            new { userIds = new[] { TestUsers.UserAId, TestUsers.UserBId } });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.UserRoles.AnyAsync(item => item.RoleId == role.Id));
+        Assert.True(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserAId && item.RoleId == 1));
+        Assert.True(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserAId && item.RoleId == 2));
+        Assert.True(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 1));
+    }
+
+    [Fact]
+    public async Task BulkRoleRemoval_ReplacesPrimaryRoleUsingDefaultUserFallback()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var role = await CreateRoleAndAssignToBothAsync(client, "PrimaryBulk");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = await db.Users.SingleAsync(user => user.Id == TestUsers.UserBId);
+            user.RoleId = role.Id;
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove",
+            new { userIds = new[] { TestUsers.UserBId } });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId).Select(user => user.RoleId).SingleAsync());
+        Assert.True(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 1));
+        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
+    }
+
+    [Fact]
+    public async Task BulkRoleRemoval_ValidatesWholeBatchBeforeChangingAssignments()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var role = await CreateRoleAndAssignToBothAsync(client, "BulkAtomic");
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = Array.Empty<int>() })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = new[] { TestUsers.UserAId, TestUsers.UserAId } })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/roles/99999/users/bulk-remove", new { userIds = new[] { TestUsers.UserAId } })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = new[] { TestUsers.UserAId, 99999 } })).StatusCode);
+        using (var missingAssignmentScope = _factory.Services.CreateScope())
+        {
+            var missingAssignmentDb = missingAssignmentScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            missingAssignmentDb.UserRoles.Remove(await missingAssignmentDb.UserRoles.SingleAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
+            await missingAssignmentDb.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = new[] { TestUsers.UserAId, TestUsers.UserBId } })).StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserAId && item.RoleId == role.Id));
+        Assert.False(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == role.Id));
+    }
+
+    [Fact]
+    public async Task BulkRoleRemoval_ProtectsOwnerLastAdminAndLastRoleAndRequiresPermission()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var admin = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var role = await CreateRoleAndAssignToBothAsync(admin, "BulkProtect");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var owner = new User
+            {
+                Id = 2001, Username = "owner", Email = "owner@example.test", DisplayName = "Owner",
+                RoleId = 1, IsSystemOwner = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+                UserRoles = { new UserRole { RoleId = 1 } }
+            };
+            db.Users.Add(owner);
+            await db.SaveChangesAsync();
+        }
+
+        using var regularUser = _factory.CreateAuthenticatedClient(TestUsers.UserBId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await regularUser.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = new[] { TestUsers.UserBId } })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync($"/api/roles/{role.Id}/users/bulk-remove", new { userIds = new[] { 2001 } })).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/roles/2/users/bulk-remove", new { userIds = new[] { TestUsers.UserAId } })).StatusCode);
+
+        var singleRole = await admin.PostAsJsonAsync("/api/roles", new { name = "OnlyBulk", description = "" });
+        var onlyRole = await singleRole.Content.ReadFromJsonAsync<RoleDto>();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.UserRoles.RemoveRange(await db.UserRoles.Where(item => item.UserId == TestUsers.UserBId).ToListAsync());
+            db.UserRoles.Add(new UserRole { UserId = TestUsers.UserBId, RoleId = onlyRole!.Id });
+            var user = await db.Users.SingleAsync(user => user.Id == TestUsers.UserBId);
+            user.RoleId = onlyRole.Id;
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.NoContent, (await admin.PostAsJsonAsync($"/api/roles/{onlyRole!.Id}/users/bulk-remove", new { userIds = new[] { TestUsers.UserBId } })).StatusCode);
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Null(await verifyDb.Users.Where(user => user.Id == TestUsers.UserBId).Select(user => user.RoleId).SingleAsync());
+        Assert.False(await verifyDb.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId));
+    }
+
+    private async Task<RoleDto> CreateRoleAndAssignToBothAsync(HttpClient client, string name)
+    {
+        var response = await client.PostAsJsonAsync("/api/roles", new { name, description = "" });
+        var role = await response.Content.ReadFromJsonAsync<RoleDto>();
+        Assert.NotNull(role);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        db.UserRoles.AddRange(
+            new UserRole { UserId = TestUsers.UserAId, RoleId = role.Id },
+            new UserRole { UserId = TestUsers.UserBId, RoleId = role.Id });
+        await db.SaveChangesAsync();
+        return role;
     }
 
     [Fact]
@@ -406,6 +530,12 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
         Assert.Equal(HttpStatusCode.OK, removeLegacyPermissions.StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync($"/api/roles/{recoveryRoleId}")).StatusCode);
 
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.UserRoles.Add(new UserRole { UserId = TestUsers.UserBId, RoleId = 2 });
+            await db.SaveChangesAsync();
+        }
         var removeAdmin = await client.PutAsJsonAsync($"/api/users/{TestUsers.UserAId}/roles", new { roleIds = new[] { 1 } });
         Assert.Equal(HttpStatusCode.OK, removeAdmin.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden,
@@ -427,7 +557,7 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
-    public async Task UserRoleReplacement_ValidatesUserRolesAndRequiresAtLeastOne()
+    public async Task UserRoleReplacement_AllowsZeroRolesAndCanAssignRolesAgain()
     {
         await GrantAdminRoleToUserAAsync();
         using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
@@ -436,9 +566,50 @@ public sealed class RbacManagementTests : IAsyncLifetime, IDisposable
         var missingRole = await client.PutAsJsonAsync($"/api/users/{TestUsers.UserBId}/roles", new { roleIds = new[] { 123456 } });
         var missingUser = await client.GetAsync("/api/users/99999/roles");
 
-        Assert.Equal(HttpStatusCode.BadRequest, empty.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, missingRole.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, missingUser.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Null(await db.Users.Where(user => user.Id == TestUsers.UserBId).Select(user => user.RoleId).SingleAsync());
+        Assert.False(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId));
+        using (var response = await client.GetAsync($"/api/users/{TestUsers.UserBId}"))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, json.RootElement.GetProperty("role").ValueKind);
+        }
+
+        using var userB = _factory.CreateAuthenticatedClient(TestUsers.UserBId);
+        Assert.Equal(HttpStatusCode.Forbidden, (await userB.GetAsync("/api/todos/me")).StatusCode);
+
+        var reassigned = await client.PutAsJsonAsync($"/api/users/{TestUsers.UserBId}/roles", new { roleIds = new[] { 2 } });
+        Assert.Equal(HttpStatusCode.OK, reassigned.StatusCode);
+        Assert.Equal(2, await db.Users.Where(user => user.Id == TestUsers.UserBId).Select(user => user.RoleId).SingleAsync());
+        Assert.True(await db.UserRoles.AnyAsync(item => item.UserId == TestUsers.UserBId && item.RoleId == 2));
+    }
+
+    [Fact]
+    public async Task ReplaceUserRoles_ProtectsLastAdminAndSystemOwner()
+    {
+        await GrantAdminRoleToUserAAsync();
+        using var client = _factory.CreateAuthenticatedClient(TestUsers.UserAId);
+        var lastAdmin = await client.PutAsJsonAsync($"/api/users/{TestUsers.UserAId}/roles", new { roleIds = Array.Empty<int>() });
+        Assert.Equal(HttpStatusCode.Conflict, lastAdmin.StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Users.Add(new User
+            {
+                Id = 2002, Username = "owner-replace", Email = "owner-replace@example.test", DisplayName = "Owner",
+                RoleId = 1, IsSystemOwner = true, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+                UserRoles = { new UserRole { RoleId = 1 } }
+            });
+            await db.SaveChangesAsync();
+        }
+        var owner = await client.PutAsJsonAsync("/api/users/2002/roles", new { roleIds = Array.Empty<int>() });
+        Assert.Equal(HttpStatusCode.Conflict, owner.StatusCode);
     }
 
     private async Task GrantAdminRoleToUserAAsync()

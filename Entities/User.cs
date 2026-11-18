@@ -14,9 +14,9 @@
 
         public string? AvatarUrl { get; set; }
 
-        public int RoleId { get; set; }
+        public int? RoleId { get; set; }
 
-        public Role Role { get; set; } = null!;
+        public Role? Role { get; set; }
             
         public DateTime CreatedAt { get; set; }
 

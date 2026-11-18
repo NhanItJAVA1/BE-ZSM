@@ -376,7 +376,7 @@ namespace BE_ZSM.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("RoleId")
+                    b.Property<int?>("RoleId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -508,8 +508,7 @@ namespace BE_ZSM.Migrations
                     b.HasOne("BE_ZSM.Entities.Role", "Role")
                         .WithMany("Users")
                         .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Role");
                 });

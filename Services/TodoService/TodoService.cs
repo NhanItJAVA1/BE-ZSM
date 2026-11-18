@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using BE_ZSM.DTOs.Todos;
+using BE_ZSM.Services.Cache;
 using BE_ZSM.Entities;
 using BE_ZSM.Enums;
 using BE_ZSM.Exceptions;
@@ -7,6 +8,9 @@ using BE_ZSM.Extensions;
 using BE_ZSM.Repositories.Generic;
 using BE_ZSM.Responses;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace BE_ZSM.Services.TodoService
 {
@@ -17,19 +21,31 @@ namespace BE_ZSM.Services.TodoService
         private readonly IGenericRepository<Todo> _todoRepo;
         private readonly IGenericRepository<TodoCategory> _categoryRepo;
         private readonly IGenericRepository<User> _userRepo;
-        public TodoService(IMapper mapper, IUnitOfWork unitOfWork)
+        private readonly ICacheService _cacheService;
+        private static readonly TimeSpan TodoCacheExpiration = TimeSpan.FromMinutes(1);
+
+        public TodoService(IMapper mapper, IUnitOfWork unitOfWork, ICacheService cacheService)
         {
             _mapper = mapper;
             _unitOfWork = unitOfWork;
             _todoRepo = _unitOfWork.GetRepository<Todo>();
             _categoryRepo = _unitOfWork.GetRepository<TodoCategory>();
             _userRepo = _unitOfWork.GetRepository<User>();
+            _cacheService = cacheService;
         }
 
         // GET OWN TODOS/FILTER/SORT/SEARCH TODOS
         public async Task<PagedResult<TodoDto>> GetTodosAsync(int userId, TodoQueryDto queryDto)
         {
-            return await GetTodosAsync(queryDto, userId);
+            var cacheKey = $"todos:me:{userId}";
+            var queryKey = CreateQueryCacheKey(queryDto);
+            var cached = await _cacheService.GetAsync<CachedTodoPage>(cacheKey);
+            if (cached?.QueryKey == queryKey)
+                return cached.Result;
+
+            var result = await GetTodosAsync(queryDto, userId);
+            await _cacheService.SetAsync(cacheKey, new CachedTodoPage(queryKey, result), TodoCacheExpiration);
+            return result;
         }
 
         public async Task<PagedResult<TodoDto>> GetTodosForUserAsync(int userId, TodoQueryDto queryDto)
@@ -133,9 +149,30 @@ namespace BE_ZSM.Services.TodoService
             _todoRepo.UpdateRange(updates);
 
             var deletedIds = dtos.Where(x => x.Id.HasValue && x.IsDeleted).Select(x => x.Id!.Value).ToList();
-            await _todoRepo.DeleteAsync(x => x.UserId == userId && deletedIds.Contains(x.Id));
+            if (deletedIds.Count > 0)
+                await _todoRepo.DeleteAsync(x => x.UserId == userId && deletedIds.Contains(x.Id));
 
             await _unitOfWork.SaveChangesAsync();
+            await _cacheService.RemoveAsync($"todos:me:{userId}");
         }
+
+        private static string CreateQueryCacheKey(TodoQueryDto queryDto)
+        {
+            var query = JsonSerializer.Serialize(new
+            {
+                Search = queryDto.Search?.Trim(),
+                queryDto.Status,
+                queryDto.Priority,
+                queryDto.Page,
+                queryDto.PageSize,
+                SortBy = queryDto.SortBy?.ToLowerInvariant(),
+                queryDto.IsDescending,
+                queryDto.IsOverdue,
+                queryDto.CategoryId
+            });
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(query)));
+        }
+
+        private sealed record CachedTodoPage(string QueryKey, PagedResult<TodoDto> Result);
     }
 }

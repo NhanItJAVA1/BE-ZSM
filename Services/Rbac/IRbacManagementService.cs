@@ -19,4 +19,5 @@ public interface IRbacManagementService
     Task<IReadOnlyList<RoleResponseDto>> ReplaceUserRolesAsync(int userId, ReplaceUserRolesDto dto, CancellationToken cancellationToken = default);
     Task<PagedResult<RoleUserDto>> GetRoleUsersAsync(int roleId, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default);
     Task RemoveUserRoleAsync(int userId, int roleId, CancellationToken cancellationToken = default);
+    Task BulkRemoveRoleFromUsersAsync(int roleId, BulkRemoveRoleUsersDto dto, CancellationToken cancellationToken = default);
 }

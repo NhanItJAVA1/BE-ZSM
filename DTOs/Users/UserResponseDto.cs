@@ -14,7 +14,7 @@ public class UserResponseDto
 
     public string? AvatarUrl { get; set; }
 
-    public string Role { get; set; } = string.Empty;
+    public string? Role { get; set; }
 
     public List<string> Roles { get; set; } = [];
 

@@ -124,8 +124,8 @@ public sealed class AdminRecoveryService(AppDbContext dbContext) : IAdminRecover
             if (!await IsSystemOwnerAsync(actorUserId, cancellationToken))
                 throw new ForbiddenException("Only the System Owner can restore administrative access", "SYSTEM_OWNER_REQUIRED");
 
-            if (!await dbContext.Users.AnyAsync(user => user.Id == targetUserId, cancellationToken))
-                throw new NotFoundException("User not found", "USER_NOT_FOUND");
+            var targetUser = await dbContext.Users.SingleOrDefaultAsync(user => user.Id == targetUserId, cancellationToken)
+                ?? throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
             var adminRole = await dbContext.Roles.SingleOrDefaultAsync(role => role.Id == DefaultAdminRoleId
                 && role.Name.ToUpper() == "ADMIN", cancellationToken);
@@ -154,6 +154,8 @@ public sealed class AdminRecoveryService(AppDbContext dbContext) : IAdminRecover
                 && item.RoleId == adminRole.Id, cancellationToken);
             if (!alreadyAssigned)
                 dbContext.UserRoles.Add(new UserRole { UserId = targetUserId, RoleId = adminRole.Id });
+            if (targetUser.RoleId is null)
+                targetUser.RoleId = adminRole.Id;
 
             var alreadyRestored = alreadyAssigned && missingPermissions.Count == 0;
             dbContext.AdminRecoveryAudits.Add(new AdminRecoveryAudit
