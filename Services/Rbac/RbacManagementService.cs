@@ -9,7 +9,6 @@ using BE_ZSM.Entities;
 using BE_ZSM.Entities.Rbac;
 using BE_ZSM.Exceptions;
 using BE_ZSM.Repositories.Generic;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 namespace BE_ZSM.Services.Rbac;
@@ -37,7 +36,7 @@ public sealed class RbacManagementService : IRbacManagementService
         _userRoleRepository = unitOfWork.GetRepository<UserRole>();
     }
 
-    // GET
+    // GET-ROLES
     public async Task<IReadOnlyList<RoleResponseDto>> GetRolesAsync(CancellationToken cancellationToken = default)
     {
         return await _roleRepository.All().AsNoTracking()
@@ -46,12 +45,11 @@ public sealed class RbacManagementService : IRbacManagementService
             .ToListAsync(cancellationToken);
     }
 
-    // POST
+    // POST-ROLE
     public async Task<RoleResponseDto> CreateRoleAsync(SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
         var name = dto.Name!.Trim();
         var description = dto.Description?.Trim() ?? string.Empty;
-        var normalizedName = name.Trim().ToUpperInvariant();
 
         var role = new Role {Name = name, Description = description };
         await _roleRepository.CreateAsync(role);
@@ -60,16 +58,15 @@ public sealed class RbacManagementService : IRbacManagementService
         return _mapper.Map<RoleResponseDto>(role);
     }
 
-    // PUT
+    // PUT-ROLE
     public async Task<RoleResponseDto> UpdateRoleAsync(int id, SaveRoleDto dto, CancellationToken cancellationToken = default)
     {
         var name = dto.Name!.Trim();
         var description = dto.Description?.Trim() ?? string.Empty;
-        var normalizedName = name.Trim().ToUpperInvariant();
 
         var role = await _roleRepository.FindAsync(item => item.Id == id) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
 
-        if (IsDefaultRole(role) && role.Name.Trim().ToUpperInvariant() != normalizedName)
+        if (IsDefaultRole(role) && !string.Equals(role.Name.Trim(), name, StringComparison.OrdinalIgnoreCase))
             throw new ConflictException("The default User and Admin role names cannot be changed", "DEFAULT_ROLE_NAME_IMMUTABLE");
 
         role.Name = name;
@@ -79,7 +76,7 @@ public sealed class RbacManagementService : IRbacManagementService
         return _mapper.Map<RoleResponseDto>(role);
     }
 
-    // DELETE
+    // DELETE-ROLE
     public async Task DeleteRoleAsync(int id, CancellationToken cancellationToken = default)
     {
         var role = await _roleRepository.FindAsync(item => item.Id == id) ?? throw new NotFoundException("Role not found", "ROLE_NOT_FOUND");
@@ -97,7 +94,7 @@ public sealed class RbacManagementService : IRbacManagementService
         await _unitOfWork.SaveChangesAsync();
     }
 
-    // Permission management
+    //GET PERMISSIONS
     public async Task<IReadOnlyList<PermissionResponseDto>> GetPermissionsAsync(CancellationToken cancellationToken = default)
     {
         return await _permissionRepository.All().AsNoTracking()
@@ -105,7 +102,7 @@ public sealed class RbacManagementService : IRbacManagementService
             .ProjectTo<PermissionResponseDto>(_mapper.ConfigurationProvider)
             .ToListAsync(cancellationToken);
     }
-
+    //GET ROLE PERMISSIONS
     public async Task<IReadOnlyList<PermissionResponseDto>> GetRolePermissionsAsync(int roleId, CancellationToken cancellationToken = default)
     {
         if (!await _roleRepository.All().AnyAsync(role => role.Id == roleId, cancellationToken))
@@ -119,6 +116,7 @@ public sealed class RbacManagementService : IRbacManagementService
             .ToListAsync(cancellationToken);
     }
 
+    //REPLACE ROLE PERMISSIONS
     public async Task<IReadOnlyList<PermissionResponseDto>> ReplaceRolePermissionsAsync(int roleId, ReplaceRolePermissionsDto dto,
         CancellationToken cancellationToken = default)
     {
@@ -157,7 +155,7 @@ public sealed class RbacManagementService : IRbacManagementService
             .ToList();
     }
 
-    // User role management
+    // USER-ROLE
     public async Task<IReadOnlyList<RoleResponseDto>> GetUserRolesAsync(int userId, CancellationToken cancellationToken = default)
     {
         if (!await _userRepository.All().AnyAsync(user => user.Id == userId, cancellationToken))
@@ -271,18 +269,10 @@ public sealed class RbacManagementService : IRbacManagementService
 
     public async Task BulkRemoveRoleFromUsersAsync(int roleId, BulkRemoveRoleUsersDto dto, CancellationToken cancellationToken = default)
     {
-        var userIds = dto.UserIds;
-        if (userIds is null || userIds.Count == 0)
-            throw new BadRequestException("At least one user ID is required.", "USER_IDS_REQUIRED");
-        if (userIds.Distinct().Count() != userIds.Count)
-            throw new BadRequestException("User IDs must not contain duplicates.", "USER_IDS_DUPLICATE");
-        if (userIds.Any(userId => userId <= 0))
-            throw new BadRequestException("User IDs must be positive.", "USER_IDS_INVALID");
+        var userIds = dto.UserIds.Distinct().ToList();
 
         await using var transaction = _dbContext.Database.IsRelational()
-            ? await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken)
-            : null;
-
+            ? await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken) : null;
         try
         {
             var role = await _roleRepository.All().AsNoTracking()
@@ -296,13 +286,12 @@ public sealed class RbacManagementService : IRbacManagementService
                 throw new NotFoundException("One or more users were not found", "USER_NOT_FOUND");
             if (users.Any(user => user.IsSystemOwner))
                 throw new ConflictException("System Owner cannot have their roles modified.", "SYSTEM_OWNER_PROTECTED");
-            if (users.Any(user => user.UserRoles.All(assignment => assignment.RoleId != roleId)))
+            if (users.Any(user => !user.UserRoles.Any(assignment => assignment.RoleId == roleId)))
                 throw new NotFoundException("One or more users do not have this role assignment", "USER_ROLE_NOT_FOUND");
             if (role.Id == 2 && role.NameNormalized == "ADMIN")
             {
-                var selectedUserIds = userIds.ToHashSet();
                 var remainingAdmins = await _userRoleRepository.All().AsNoTracking()
-                    .CountAsync(assignment => assignment.RoleId == roleId && !selectedUserIds.Contains(assignment.UserId), cancellationToken);
+                    .CountAsync(assignment => assignment.RoleId == roleId && !userIds.Contains(assignment.UserId), cancellationToken);
                 if (remainingAdmins == 0)
                     throw new ConflictException("The last Admin role assignment cannot be removed.", "LAST_ADMIN_PROTECTED");
             }
