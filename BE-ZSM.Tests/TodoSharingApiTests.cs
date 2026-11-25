@@ -50,11 +50,17 @@ public sealed class TodoSharingApiTests : IAsyncLifetime, IDisposable
 
         var sharedTodos = await shared.GetFromJsonAsync<PagedTodos>("/api/todos/shared");
         Assert.Equal(TodoId, Assert.Single(sharedTodos!.Items).Id);
+        Assert.Equal("Todo User A", Assert.Single(sharedTodos.Items).OwnerDisplayName);
         Assert.Empty(await shared.GetFromJsonAsync<List<NoteItem>>($"/api/todos/{TodoId}/notes") ?? []);
 
         var addNote = await shared.PostAsJsonAsync($"/api/todos/{TodoId}/notes", new { content = "Shared note" });
         Assert.Equal(HttpStatusCode.OK, addNote.StatusCode);
-        Assert.Equal("Shared note", (await addNote.Content.ReadFromJsonAsync<NoteItem>())!.Content);
+        var createdNote = (await addNote.Content.ReadFromJsonAsync<NoteItem>())!;
+        Assert.Equal("Shared note", createdNote.Content);
+        Assert.Equal("Todo User B", createdNote.DisplayName);
+
+        var listedNotes = await shared.GetFromJsonAsync<List<NoteItem>>($"/api/todos/{TodoId}/notes");
+        Assert.Equal("Todo User B", Assert.Single(listedNotes!).DisplayName);
         var ownerUpdate = await owner.PutAsJsonAsync("/api/todos/batch", new[]
         {
             new { id = TodoId, title = "Shared todo", description = "Updated after note", priority = "Medium" }
@@ -162,6 +168,7 @@ public sealed class TodoSharingApiTests : IAsyncLifetime, IDisposable
     private sealed class TodoItem
     {
         public int Id { get; set; }
+        public string OwnerDisplayName { get; set; } = string.Empty;
         public string? Description { get; set; }
     }
 
@@ -172,6 +179,7 @@ public sealed class TodoSharingApiTests : IAsyncLifetime, IDisposable
 
     private sealed class NoteItem
     {
+        public string DisplayName { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
     }
 }

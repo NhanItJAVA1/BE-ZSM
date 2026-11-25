@@ -26,6 +26,7 @@ public class MappingProfile : Profile
                 .OrderBy(code => code)));
 
         CreateMap<Todo, TodoDto>()
+           .ForMember(dest => dest.OwnerDisplayName, opt => opt.MapFrom(src => src.User.DisplayName))
            .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))
            .ForMember(dest => dest.IsOverdue, opt => opt.MapFrom(src => src.DueDate.HasValue && src.DueDate.Value < DateTime.UtcNow && src.Status != TodoStatus.Done))
            .ForMember(dest => dest.IsCompletedLate, opt => opt.MapFrom(src => src.CompletedAt.HasValue && src.DueDate.HasValue && src.CompletedAt.Value > src.DueDate.Value));
@@ -68,7 +69,8 @@ public class MappingProfile : Profile
 
         CreateMap<TodoActivity, TodoActivityDto>();
         CreateMap<TodoShare, TodoShareDto>();
-        CreateMap<TodoNote, TodoNoteDto>();
+        CreateMap<TodoNote, TodoNoteDto>()
+            .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.User.DisplayName));
 
         CreateMap<Role, RoleResponseDto>();
         CreateMap<Permission, PermissionResponseDto>();

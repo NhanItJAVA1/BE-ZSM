@@ -58,6 +58,7 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task<PagedResult<TodoDto>> GetTodosForUserAsync(int userId, TodoQueryDto queryDto)
         {
+            // Used by the read-all route for one target user; return 404 when that user does not exist.
             if (!await _userRepo.All().AsNoTracking().AnyAsync(user => user.Id == userId))
                 throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
@@ -66,6 +67,7 @@ namespace BE_ZSM.Services.TodoService
 
         public async Task<PagedResult<TodoDto>> GetAllTodosAsync(TodoQueryDto queryDto)
         {
+            // Used by the read-all route to query Todos across all users.
             return await GetTodosAsync(queryDto, (int?)null);
         }
 
@@ -110,7 +112,9 @@ namespace BE_ZSM.Services.TodoService
 
         private async Task<PagedResult<TodoDto>> GetTodosAsync(TodoQueryDto queryDto, IQueryable<Todo> source)
         {
-            IQueryable<Todo> query = source.Include(todo => todo.Category);
+            IQueryable<Todo> query = source
+                .Include(todo => todo.Category)
+                .Include(todo => todo.User);
 
             if (!string.IsNullOrWhiteSpace(queryDto.Search))
             {
@@ -222,6 +226,7 @@ namespace BE_ZSM.Services.TodoService
         {
             await EnsureTodoIsAccessibleAsync(todoId, userId, canReadOwned, canReadShared);
             var notes = await _todoNoteRepo.All().AsNoTracking()
+                .Include(note => note.User)
                 .Where(note => note.TodoId == todoId)
                 .OrderBy(note => note.CreatedAt).ThenBy(note => note.Id)
                 .ToListAsync();
@@ -241,6 +246,8 @@ namespace BE_ZSM.Services.TodoService
             {
                 TodoId = todoId,
                 UserId = userId,
+                User = await _userRepo.FindAsync(user => user.Id == userId)
+                    ?? throw new NotFoundException("User not found", "USER_NOT_FOUND"),
                 Content = dto.Content,
                 CreatedAt = DateTime.UtcNow
             };
