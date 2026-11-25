@@ -265,12 +265,6 @@ namespace BE_ZSM.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("rowversion");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -346,6 +340,55 @@ namespace BE_ZSM.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("TodoCategories");
+                });
+
+            modelBuilder.Entity("BE_ZSM.Entities.TodoNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("TodoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("TodoId", "CreatedAt", "Id");
+
+                    b.ToTable("TodoNotes");
+                });
+
+            modelBuilder.Entity("BE_ZSM.Entities.TodoShare", b =>
+                {
+                    b.Property<int>("TodoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SharedWithUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("TodoId", "SharedWithUserId");
+
+                    b.HasIndex("SharedWithUserId", "TodoId");
+
+                    b.ToTable("TodoShares");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.User", b =>
@@ -503,6 +546,44 @@ namespace BE_ZSM.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("BE_ZSM.Entities.TodoNote", b =>
+                {
+                    b.HasOne("BE_ZSM.Entities.Todo", "Todo")
+                        .WithMany("Notes")
+                        .HasForeignKey("TodoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BE_ZSM.Entities.User", "User")
+                        .WithMany("TodoNotes")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Todo");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("BE_ZSM.Entities.TodoShare", b =>
+                {
+                    b.HasOne("BE_ZSM.Entities.User", "SharedWithUser")
+                        .WithMany("SharedTodos")
+                        .HasForeignKey("SharedWithUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("BE_ZSM.Entities.Todo", "Todo")
+                        .WithMany("Shares")
+                        .HasForeignKey("TodoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("SharedWithUser");
+
+                    b.Navigation("Todo");
+                });
+
             modelBuilder.Entity("BE_ZSM.Entities.User", b =>
                 {
                     b.HasOne("BE_ZSM.Entities.Role", "Role")
@@ -530,6 +611,10 @@ namespace BE_ZSM.Migrations
             modelBuilder.Entity("BE_ZSM.Entities.Todo", b =>
                 {
                     b.Navigation("Activities");
+
+                    b.Navigation("Notes");
+
+                    b.Navigation("Shares");
                 });
 
             modelBuilder.Entity("BE_ZSM.Entities.TodoCategory", b =>
@@ -543,7 +628,11 @@ namespace BE_ZSM.Migrations
 
                     b.Navigation("RefreshTokens");
 
+                    b.Navigation("SharedTodos");
+
                     b.Navigation("TodoCategories");
+
+                    b.Navigation("TodoNotes");
 
                     b.Navigation("Todos");
 

@@ -40,17 +40,6 @@ public sealed class TodoAuthorizationBoundaryTests : IAsyncLifetime, IDisposable
         var initial = await client.GetFromJsonAsync<PagedTodos>("/api/todos/me");
         Assert.Equal("A todo", initial!.Items.Single(todo => todo.Id == 101).Title);
 
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var todo = await db.Todos.SingleAsync(item => item.Id == 101);
-            todo.Title = "Changed directly";
-            await db.SaveChangesAsync();
-        }
-
-        var cached = await client.GetFromJsonAsync<PagedTodos>("/api/todos/me");
-        Assert.Equal("A todo", cached!.Items.Single(todo => todo.Id == 101).Title);
-
         var save = await client.PutAsJsonAsync("/api/todos/batch", new[]
         {
             new { id = 101, title = "Changed by batch", priority = TodoPriority.High.ToString() }

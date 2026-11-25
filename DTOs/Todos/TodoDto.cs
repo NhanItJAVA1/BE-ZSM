@@ -25,6 +25,5 @@ namespace BE_ZSM.DTOs.Todos
         public int? CategoryId { get; set; }
         public string? CategoryName { get; set; }
 
-        public byte[] RowVersion { get; set; } = [];
     }
 }

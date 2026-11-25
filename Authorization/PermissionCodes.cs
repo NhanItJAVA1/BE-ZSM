@@ -5,6 +5,9 @@ public static class PermissionCodes
     public const string TodoRead = "todo.read";
     public const string TodoWrite = "todo.write";
     public const string TodosReadAll = "todos.read-all";
+    public const string TodosShare = "todos.share";
+    public const string TodosReadShared = "todos.read-shared";
+    public const string TodosNotesCreate = "todos.notes.create";
     public const string TodoCategoryRead = "todo-category.read";
     public const string TodoCategoryCreate = "todo-category.create";
     public const string TodoCategoryUpdate = "todo-category.update";
@@ -26,6 +29,9 @@ public static class PermissionCodes
         TodoRead,
         TodoWrite,
         TodosReadAll,
+        TodosShare,
+        TodosReadShared,
+        TodosNotesCreate,
         TodoCategoryRead,
         TodoCategoryCreate,
         TodoCategoryUpdate,

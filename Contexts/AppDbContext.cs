@@ -16,6 +16,8 @@ namespace BE_ZSM.Contexts
         public DbSet<Todo> Todos { get; set; }
         public DbSet<TodoCategory> TodoCategories { get; set; }
         public DbSet<TodoActivity> TodoActivities { get; set; }
+        public DbSet<TodoShare> TodoShares { get; set; }
+        public DbSet<TodoNote> TodoNotes { get; set; }
         public DbSet<ExternalLogin> ExternalLogins => Set<ExternalLogin>();
         public DbSet<AdminRecoveryAudit> AdminRecoveryAudits => Set<AdminRecoveryAudit>();
 
@@ -162,6 +164,41 @@ namespace BE_ZSM.Contexts
                     .WithMany(u => u.TodoCategories)
                     .HasForeignKey(c => c.UserId)
                     .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<TodoShare>(entity =>
+            {
+                entity.HasKey(share => new { share.TodoId, share.SharedWithUserId });
+                entity.Property(share => share.CreatedAt).IsRequired();
+                entity.HasIndex(share => new { share.SharedWithUserId, share.TodoId });
+
+                entity.HasOne(share => share.Todo)
+                    .WithMany(todo => todo.Shares)
+                    .HasForeignKey(share => share.TodoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(share => share.SharedWithUser)
+                    .WithMany(user => user.SharedTodos)
+                    .HasForeignKey(share => share.SharedWithUserId)
+                    .OnDelete(DeleteBehavior.NoAction);
+            });
+
+            modelBuilder.Entity<TodoNote>(entity =>
+            {
+                entity.HasKey(note => note.Id);
+                entity.Property(note => note.Content).IsRequired().HasMaxLength(2000);
+                entity.Property(note => note.CreatedAt).IsRequired();
+                entity.HasIndex(note => new { note.TodoId, note.CreatedAt, note.Id });
+
+                entity.HasOne(note => note.Todo)
+                    .WithMany(todo => todo.Notes)
+                    .HasForeignKey(note => note.TodoId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(note => note.User)
+                    .WithMany(user => user.TodoNotes)
+                    .HasForeignKey(note => note.UserId)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
 
             modelBuilder.Entity<TodoActivity>(entity =>

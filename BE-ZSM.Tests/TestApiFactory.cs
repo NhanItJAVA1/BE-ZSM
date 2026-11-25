@@ -119,6 +119,9 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
             (PermissionCodes.TodoRead, "Read todos"),
             (PermissionCodes.TodoWrite, "Create, update, and delete todos"),
             (PermissionCodes.TodosReadAll, "Read todos across all users"),
+            (PermissionCodes.TodosShare, "Share todos with other users"),
+            (PermissionCodes.TodosReadShared, "Read todos shared with the current user"),
+            (PermissionCodes.TodosNotesCreate, "Create notes on accessible todos"),
             (PermissionCodes.TodoCategoryRead, "Read todo categories"),
             (PermissionCodes.TodoCategoryCreate, "Create todo categories"),
             (PermissionCodes.TodoCategoryUpdate, "Update todo categories"),
@@ -161,7 +164,10 @@ public sealed class TestApiFactory : WebApplicationFactory<Program>
             RoleId = 1,
             PermissionId = permissionIds[code]
         }));
-        db.RolePermissions.AddRange(permissions.Where(permission => permission.Item1 != PermissionCodes.TodosReadAll).Select(permission => new RolePermission
+        db.RolePermissions.AddRange(permissions.Where(permission => permission.Item1 != PermissionCodes.TodosReadAll
+            && permission.Item1 != PermissionCodes.TodosShare
+            && permission.Item1 != PermissionCodes.TodosReadShared
+            && permission.Item1 != PermissionCodes.TodosNotesCreate).Select(permission => new RolePermission
         {
             RoleId = 2,
             PermissionId = permissionIds[permission.Item1]

@@ -31,7 +31,6 @@ public class MappingProfile : Profile
            .ForMember(dest => dest.IsCompletedLate, opt => opt.MapFrom(src => src.CompletedAt.HasValue && src.DueDate.HasValue && src.CompletedAt.Value > src.DueDate.Value));
 
         CreateMap<SaveTodoDto, Todo>()
-            .ForMember(x => x.RowVersion, opt => opt.Ignore())
             .ForMember(x => x.UserId, opt => opt.Ignore())
             .ForMember(x => x.User, opt => opt.Ignore())
             .ForMember(x => x.UpdatedAt, opt => opt.Ignore())
@@ -40,7 +39,6 @@ public class MappingProfile : Profile
             .ForMember(x => x.Activities, opt => opt.Ignore());
         
         CreateMap<SaveTodoDto, Todo>()
-            .ForMember(x => x.RowVersion, opt => opt.Ignore())
             .ForMember(x => x.UserId, opt => opt.Ignore())
             .ForMember(x => x.User, opt => opt.Ignore())
             .ForMember(x => x.UpdatedAt, opt => opt.Ignore())
@@ -69,6 +67,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Todos, opt => opt.Ignore());
 
         CreateMap<TodoActivity, TodoActivityDto>();
+        CreateMap<TodoShare, TodoShareDto>();
+        CreateMap<TodoNote, TodoNoteDto>();
 
         CreateMap<Role, RoleResponseDto>();
         CreateMap<Permission, PermissionResponseDto>();

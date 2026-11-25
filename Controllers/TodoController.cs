@@ -13,10 +13,12 @@ namespace BE_ZSM.Controllers;
 public class TodoController : ControllerBase
 {
     private readonly ITodoService _todoService;
+    private readonly IAuthorizationService _authorizationService;
 
-    public TodoController(ITodoService todoService)
+    public TodoController(ITodoService todoService, IAuthorizationService authorizationService)
     {
         _todoService = todoService;
+        _authorizationService = authorizationService;
     }
 
     [HttpGet("me")]
@@ -28,6 +30,60 @@ public class TodoController : ControllerBase
         var userId = GetCurrentUserId();
         var todos = await _todoService.GetTodosAsync(userId, query);
         return Ok(todos);
+    }
+
+    [HttpGet("shared")]
+    [HasPermission(PermissionCodes.TodosReadShared)]
+    [EndpointSummary("Get Todos shared with the authenticated user")]
+    public async Task<IActionResult> GetSharedTodos([FromQuery] TodoQueryDto query)
+    {
+        return Ok(await _todoService.GetSharedTodosAsync(GetCurrentUserId(), query));
+    }
+
+    [HttpGet("{id:int}/shares")]
+    [HasPermission(PermissionCodes.TodosShare)]
+    [EndpointSummary("Get recipients for an owned Todo")]
+    public async Task<IActionResult> GetTodoShares(int id)
+    {
+        return Ok(await _todoService.GetTodoSharesAsync(id, GetCurrentUserId()));
+    }
+
+    [HttpPut("{id:int}/shares")]
+    [HasPermission(PermissionCodes.TodosShare)]
+    [EndpointSummary("Replace recipients for an owned Todo")]
+    public async Task<IActionResult> ReplaceTodoShares(int id, [FromBody] ReplaceTodoSharesDto dto,
+        CancellationToken cancellationToken)
+    {
+        await _todoService.ReplaceTodoSharesAsync(id, dto, GetCurrentUserId(), cancellationToken);
+        return Ok(new { message = "Todo shares updated successfully" });
+    }
+
+    [HttpGet("{id:int}/notes")]
+    [EndpointSummary("Get notes for an accessible Todo")]
+    public async Task<IActionResult> GetTodoNotes(int id)
+    {
+        var canReadOwned = await HasPermissionAsync(PermissionCodes.TodoRead);
+        var canReadShared = await HasPermissionAsync(PermissionCodes.TodosReadShared);
+        if (!canReadOwned && !canReadShared)
+            throw new BE_ZSM.Exceptions.ForbiddenException("A Todo read permission is required", "TODO_READ_PERMISSION_REQUIRED");
+
+        return Ok(await _todoService.GetTodoNotesAsync(id, GetCurrentUserId(), canReadOwned, canReadShared));
+    }
+
+    [HttpPost("{id:int}/notes")]
+    [EndpointSummary("Add a note to an accessible Todo")]
+    public async Task<IActionResult> CreateTodoNote(int id, [FromBody] CreateTodoNoteDto dto)
+    {
+        if (!await HasPermissionAsync(PermissionCodes.TodosNotesCreate))
+            throw new BE_ZSM.Exceptions.ForbiddenException("The Todo note create permission is required", "TODO_NOTE_CREATE_PERMISSION_REQUIRED");
+
+        var canReadOwned = await HasPermissionAsync(PermissionCodes.TodoRead);
+        var canReadShared = await HasPermissionAsync(PermissionCodes.TodosReadShared);
+        if (!canReadOwned && !canReadShared)
+            throw new BE_ZSM.Exceptions.ForbiddenException("A Todo read permission is required", "TODO_READ_PERMISSION_REQUIRED");
+
+        var note = await _todoService.CreateTodoNoteAsync(id, dto, GetCurrentUserId(), canReadOwned, canReadShared);
+        return Ok(note);
     }
 
     [HttpGet]
@@ -73,4 +129,11 @@ public class TodoController : ControllerBase
             throw new UnauthorizedAccessException("User ID not found");
         return int.Parse(userIdClaim.Value);
     }   
+
+    private async Task<bool> HasPermissionAsync(string permissionCode)
+    {
+        var result = await _authorizationService.AuthorizeAsync(User,
+            $"{HasPermissionAttribute.PolicyPrefix}{permissionCode}");
+        return result.Succeeded;
+    }
 }

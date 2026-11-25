@@ -1,5 +1,4 @@
 ﻿using BE_ZSM.Enums;
-using System.ComponentModel.DataAnnotations;
 
 namespace BE_ZSM.Entities
 {
@@ -19,8 +18,8 @@ namespace BE_ZSM.Entities
         public int? CategoryId { get; set; }
         public TodoCategory? Category { get; set; }
 
-        [Timestamp]
-        public byte[] RowVersion { get; set; } = [];
         public ICollection<TodoActivity> Activities { get; set; } = [];
+        public ICollection<TodoShare> Shares { get; set; } = [];
+        public ICollection<TodoNote> Notes { get; set; } = [];
     }
 }

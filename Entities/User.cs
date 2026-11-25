@@ -27,6 +27,8 @@
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
         public ICollection<Todo> Todos { get; set; } = [];
         public ICollection<TodoCategory> TodoCategories { get; set; } = [];
+        public ICollection<TodoShare> SharedTodos { get; set; } = [];
+        public ICollection<TodoNote> TodoNotes { get; set; } = [];
         public ICollection<ExternalLogin> ExternalLogins { get; set; } = [];
         public ICollection<Rbac.UserRole> UserRoles { get; set; } = [];
     }

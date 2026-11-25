@@ -17,6 +17,5 @@ namespace BE_ZSM.DTOs.Todos
         public DateTime? DueDate { get; set; }
         public int? CategoryId { get; set; }
         public bool IsDeleted { get; set; }
-        public byte[]? RowVersion { get; set; }
     }
 }
