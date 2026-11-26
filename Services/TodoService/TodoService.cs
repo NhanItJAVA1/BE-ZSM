@@ -51,31 +51,29 @@ namespace BE_ZSM.Services.TodoService
             if (cached?.QueryKey == queryKey)
                 return cached.Result;
 
-            var result = await GetTodosAsync(queryDto, userId);
+            var result = await GetTodosForOwnerAsync(queryDto, userId);
             await _cacheService.SetAsync(cacheKey, new CachedTodoPage(queryKey, result), TodoCacheExpiration);
             return result;
         }
 
+        // Used by the read-all route for one target user; return 404 when that user does not exist.
         public async Task<PagedResult<TodoDto>> GetTodosForUserAsync(int userId, TodoQueryDto queryDto)
         {
-            // Used by the read-all route for one target user; return 404 when that user does not exist.
             if (!await _userRepo.All().AsNoTracking().AnyAsync(user => user.Id == userId))
                 throw new NotFoundException("User not found", "USER_NOT_FOUND");
 
-            return await GetTodosAsync(queryDto, userId);
+            return await GetTodosForOwnerAsync(queryDto, userId);
         }
 
+        // Used by the read-all route to query Todos across all users.
         public async Task<PagedResult<TodoDto>> GetAllTodosAsync(TodoQueryDto queryDto)
-        {
-            // Used by the read-all route to query Todos across all users.
-            return await GetTodosAsync(queryDto, (int?)null);
-        }
+            => await GetTodosForOwnerAsync(queryDto, (int?)null);
 
         public async Task<PagedResult<TodoDto>> GetSharedTodosAsync(int userId, TodoQueryDto queryDto)
         {
             var query = _todoRepo.All().AsNoTracking()
                 .Where(todo => todo.Shares.Any(share => share.SharedWithUserId == userId));
-            return await GetTodosAsync(queryDto, query);
+            return await QueryTodosAsync(queryDto, query);
         }
 
         public async Task<PagedResult<TodoUserSummaryDto>> GetUserTodoSummaryAsync(string? search, int page, int pageSize)
@@ -101,16 +99,16 @@ namespace BE_ZSM.Services.TodoService
             return await summaries.ToPagedResultAsync(page, pageSize);
         }
 
-        private async Task<PagedResult<TodoDto>> GetTodosAsync(TodoQueryDto queryDto, int? userId)
+        private async Task<PagedResult<TodoDto>> GetTodosForOwnerAsync(TodoQueryDto queryDto, int? userId)
         {
             var query = _todoRepo.All().AsNoTracking().AsQueryable();
             if (userId.HasValue)
                 query = query.Where(todo => todo.UserId == userId.Value);
 
-            return await GetTodosAsync(queryDto, query);
+            return await QueryTodosAsync(queryDto, query);
         }
 
-        private async Task<PagedResult<TodoDto>> GetTodosAsync(TodoQueryDto queryDto, IQueryable<Todo> source)
+        private async Task<PagedResult<TodoDto>> QueryTodosAsync(TodoQueryDto queryDto, IQueryable<Todo> source)
         {
             IQueryable<Todo> query = source
                 .Include(todo => todo.Category)
@@ -159,7 +157,7 @@ namespace BE_ZSM.Services.TodoService
             return _mapper.Map<List<TodoShareDto>>(shares);
         }
 
-        public async Task ReplaceTodoSharesAsync(int todoId, ReplaceTodoSharesDto dto, int ownerId, CancellationToken cancellationToken = default)
+        public async Task SetTodoShareRecipientsAsync(int todoId, ReplaceTodoSharesDto dto, int ownerId, CancellationToken cancellationToken = default)
         {
             await using var transaction = _dbContext.Database.IsRelational()
                 ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)

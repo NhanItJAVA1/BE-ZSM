@@ -54,7 +54,7 @@ public class TodoController : ControllerBase
     public async Task<IActionResult> ReplaceTodoShares(int id, [FromBody] ReplaceTodoSharesDto dto,
         CancellationToken cancellationToken)
     {
-        await _todoService.ReplaceTodoSharesAsync(id, dto, GetCurrentUserId(), cancellationToken);
+        await _todoService.SetTodoShareRecipientsAsync(id, dto, GetCurrentUserId(), cancellationToken);
         return Ok(new { message = "Todo shares updated successfully" });
     }
 

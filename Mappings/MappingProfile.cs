@@ -70,7 +70,9 @@ public class MappingProfile : Profile
         CreateMap<TodoActivity, TodoActivityDto>();
         CreateMap<TodoShare, TodoShareDto>();
         CreateMap<TodoNote, TodoNoteDto>()
-            .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.User.DisplayName));
+            .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.User.DisplayName))
+            .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src =>
+                DateTime.SpecifyKind(src.CreatedAt, DateTimeKind.Utc)));
 
         CreateMap<Role, RoleResponseDto>();
         CreateMap<Permission, PermissionResponseDto>();

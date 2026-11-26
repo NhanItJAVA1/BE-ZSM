@@ -12,7 +12,7 @@ public interface ITodoService
     Task<PagedResult<TodoUserSummaryDto>> GetUserTodoSummaryAsync(string? search, int page, int pageSize);
     Task SaveTodosAsync(List<SaveTodoDto> dtos, int userId);
     Task<IReadOnlyList<TodoShareDto>> GetTodoSharesAsync(int todoId, int ownerId);
-    Task ReplaceTodoSharesAsync(int todoId, ReplaceTodoSharesDto dto, int ownerId, CancellationToken cancellationToken = default);
+    Task SetTodoShareRecipientsAsync(int todoId, ReplaceTodoSharesDto dto, int ownerId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<TodoNoteDto>> GetTodoNotesAsync(int todoId, int userId, bool canReadOwned, bool canReadShared);
     Task<TodoNoteDto> CreateTodoNoteAsync(int todoId, CreateTodoNoteDto dto, int userId, bool canReadOwned, bool canReadShared);
 }
